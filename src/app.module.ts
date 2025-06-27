@@ -7,6 +7,11 @@ import { AuthModule } from './auth/auth.module';
 import { RolesModule } from './roles/roles.module';
 import { Role } from "./roles/roles.model";
 import { UserRoles } from "./roles/user-roles.model";
+import { AssetsModule } from './assets/assets.module';
+import { PortfoliosModule } from './portfolio/portfolios.module';
+import { Asset } from "./assets/assets.model";
+import { Portfolio } from "./portfolio/portfolios.model";
+import { PortfolioAssets } from "./assets/portfolio-assets.model";
 
 @Module({
   imports: [
@@ -20,12 +25,14 @@ import { UserRoles } from "./roles/user-roles.model";
       username: process.env.POSTGRES_USER,
       password: process.env.POSTGRES_PASSWORD,
       database: process.env.POSTGRES_DB,
-      models: [User, Role, UserRoles],
+      models: [User, Role, UserRoles, Asset, Portfolio, PortfolioAssets],
       autoLoadModels: true
     }),
     UsersModule,
     AuthModule,
     RolesModule,
+    AssetsModule,
+    PortfoliosModule,
   ]
 })
 export class AppModule {
