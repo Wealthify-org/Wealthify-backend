@@ -21,7 +21,7 @@ export class PortfolioAssets extends Model<PortfolioAssets, PortfolioAssetCreati
   @ForeignKey(() => Portfolio)
   @Column({type: DataType.INTEGER})
   declare portfolioId: number
-
+  
   @Column({type: DataType.DOUBLE})
   declare quantity: number
 

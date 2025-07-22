@@ -1,7 +1,9 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { AssetsService } from './assets.service';
 import { CreateAssetDto } from './dto/create-asset.dto';
 import { AddAssetToPortfolioDto } from './dto/add-asset-to-portfolio.dto';
+import { SellAssetDto } from './dto/sell-asset.dto';
+import { RemoveAssetFromPortfolioDto } from './dto/remove-asset-from-portfolio.dto';
 
 @Controller('assets')
 export class AssetsController {
@@ -17,8 +19,23 @@ export class AssetsController {
     return this.assetsService.addAssetToPortfolio(dto)
   }
 
-  @Get()
-  getByTicker(@Query('ticker') ticker: string) {
+  @Get(':ticker')
+  getByTicker(@Param('ticker') ticker: string) {
     return this.assetsService.getAssetByTicker(ticker)
+  }
+
+  @Patch()
+  sellAsset(@Body() dto: SellAssetDto) {
+    return this.assetsService.sellAsset(dto)
+  }
+
+  @Delete('remove-from-portfolio')
+  removeAssetFromPortfolio(@Body() dto: RemoveAssetFromPortfolioDto) {
+    return this.assetsService.removeAssetFromPortfolio(dto)
+  }
+
+  @Delete(':ticker')
+  deleteAsset(@Param('ticker') ticker: string) {
+    return this.assetsService.deleteAsset(ticker)
   }
 }

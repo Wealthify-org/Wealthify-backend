@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { User } from './users.model';
 import { InjectModel } from '@nestjs/sequelize';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -10,6 +10,12 @@ export class UsersService {
               private roleService: RolesService) {}
 
   async createUser(dto: CreateUserDto) {
+    const existingUser = await this.getUserByEmail(dto.email)
+
+    if (existingUser) {
+      throw new HttpException('User with such email already exists', HttpStatus.BAD_REQUEST)
+    }
+
     const user = await this.userRepository.create(dto)
     const role = await this.roleService.getRoleByValue('USER')
     

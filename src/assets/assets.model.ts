@@ -5,6 +5,7 @@ import { PortfolioAssets } from "./portfolio-assets.model"
 interface AssetCreationAttrs {
   name: string
   ticker: string
+  type: 'Crypto' | 'Bond' | 'Stock' | 'Fiat'
 }
 
 @Table({tableName: 'assets'})
@@ -20,7 +21,7 @@ export class Asset extends Model<Asset, AssetCreationAttrs> {
   ticker: string
 
   @Column({type: DataType.STRING, allowNull: false})
-  type: 'Crypto' | 'Bond' | 'Stock'
+  type: 'Crypto' | 'Bond' | 'Stock' | 'Fiat'
 
   @BelongsToMany(() => Portfolio, () => PortfolioAssets)
   portfolios: Portfolio[]
