@@ -1,4 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger"
+import { AssetType } from "../asset-type.enum"
 
 export class CreateAssetDto {
   @ApiProperty({ example: 'Bitcoin' })
@@ -8,5 +9,5 @@ export class CreateAssetDto {
   readonly ticker: string
 
   @ApiProperty({ example: 'Crypto' })
-  readonly type: 'Crypto' | 'Bond' | 'Stock' | 'Fiat'
+  readonly type: AssetType
 }

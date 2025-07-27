@@ -5,12 +5,14 @@ import { SequelizeModule } from '@nestjs/sequelize';
 import { Portfolio } from 'src/portfolio/portfolios.model';
 import { Asset } from './assets.model';
 import { PortfolioAssets } from './portfolio-assets.model';
+import { TransactionsModule } from 'src/transactions/transactions.module';
 
 @Module({
   controllers: [AssetsController],
   providers: [AssetsService],
   imports: [
-    SequelizeModule.forFeature([Asset, Portfolio, PortfolioAssets])
+    SequelizeModule.forFeature([Asset, Portfolio, PortfolioAssets]),
+    TransactionsModule
   ],
   exports: [
     AssetsService

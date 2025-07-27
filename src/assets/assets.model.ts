@@ -1,11 +1,12 @@
 import { Table, Model, Column, DataType, BelongsToMany } from "sequelize-typescript"
 import { Portfolio } from "src/portfolio/portfolios.model"
 import { PortfolioAssets } from "./portfolio-assets.model"
+import { AssetType } from "./asset-type.enum"
 
 interface AssetCreationAttrs {
   name: string
   ticker: string
-  type: 'Crypto' | 'Bond' | 'Stock' | 'Fiat'
+  type: AssetType
 }
 
 @Table({tableName: 'assets'})
@@ -20,8 +21,8 @@ export class Asset extends Model<Asset, AssetCreationAttrs> {
   @Column({type: DataType.STRING, unique: true, allowNull: false})
   ticker: string
 
-  @Column({type: DataType.STRING, allowNull: false})
-  type: 'Crypto' | 'Bond' | 'Stock' | 'Fiat'
+  @Column({type: DataType.ENUM(...Object.values(AssetType)), allowNull: false})
+  type: AssetType
 
   @BelongsToMany(() => Portfolio, () => PortfolioAssets)
   portfolios: Portfolio[]

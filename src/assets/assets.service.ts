@@ -7,14 +7,19 @@ import { PortfolioAssets } from './portfolio-assets.model';
 import { AddAssetToPortfolioDto } from './dto/add-asset-to-portfolio.dto';
 import { Portfolio } from 'src/portfolio/portfolios.model';
 import { SellAssetDto } from './dto/sell-asset.dto';
-import { where } from 'sequelize';
 import { RemoveAssetFromPortfolioDto } from './dto/remove-asset-from-portfolio.dto';
+import { TransactionsService } from 'src/transactions/transactions.service';
+import { AssetType } from './asset-type.enum';
+import { TransactionType } from 'src/transactions/transaction-type.enum';
 
 @Injectable()
 export class AssetsService {
-  constructor(@InjectModel(Asset) private assetRepository: typeof Asset,
-              @InjectModel(PortfolioAssets) private portfolioAssetRepository: typeof PortfolioAssets,
-              @InjectModel(Portfolio) private portfolioRepository: typeof Portfolio) {}
+  constructor(
+    @InjectModel(Asset) private assetRepository: typeof Asset,
+    @InjectModel(PortfolioAssets) private portfolioAssetRepository: typeof PortfolioAssets,
+    @InjectModel(Portfolio) private portfolioRepository: typeof Portfolio,
+    private transactionsService: TransactionsService
+    ) {}
   
   async addAssetToPortfolio(dto: AddAssetToPortfolioDto) {
     const { portfolioId, assetTicker, quantity, purchasePrice } = dto
@@ -31,14 +36,14 @@ export class AssetsService {
     }
 
     let portfolioAsset = await this.portfolioAssetRepository.findOne({where: {portfolioId, assetId: asset.id}})
-
+    const date = new Date()
     if (portfolioAsset) {
       const newQuantity = portfolioAsset.dataValues.quantity + quantity
       const newAverageBuyPrice = (portfolioAsset.dataValues.quantity * portfolioAsset.dataValues.averageBuyPrice + quantity * purchasePrice) / newQuantity
 
       portfolioAsset.quantity = newQuantity
       portfolioAsset.averageBuyPrice = newAverageBuyPrice
-      portfolioAsset.purchaseDate = new Date()
+      portfolioAsset.purchaseDate = date
       await portfolioAsset.save()
     } else {
 
@@ -51,10 +56,19 @@ export class AssetsService {
 
       portfolioAsset = await this.portfolioAssetRepository.create(portfolioAssetData);
       
-      const currentDate = new Date()
-      portfolioAsset.dataValues.purchaseDate = currentDate
+      const currentDate = date
+      portfolioAsset.purchaseDate = currentDate
       await portfolioAsset.save()
     }
+
+    await this.transactionsService.createTransaction({
+      portfolioId,
+      assetId: asset.dataValues.id,
+      quantity,
+      pricePerUnit: purchasePrice,
+      type: TransactionType.BUY,
+      date: date
+    })
 
     return portfolioAsset
   }
@@ -114,12 +128,21 @@ export class AssetsService {
         usdAsset = await this.assetRepository.create({
           name: 'US Dollar',
           ticker: 'USD',
-          type: 'Fiat'
+          type: AssetType.FIAT
         })
       }
 
       await this.addAssetToPortfolio({portfolioId, assetTicker: usdAsset.dataValues.ticker, quantity: usdAmount, purchasePrice: 1})
     }
+
+    await this.transactionsService.createTransaction({
+      portfolioId,
+      assetId: asset.dataValues.id,
+      quantity,
+      pricePerUnit: pricePerUnit,
+      type: TransactionType.SELL,
+      date: new Date()
+    })
 
     return portfolioAsset
   }
@@ -129,6 +152,14 @@ export class AssetsService {
 
     if (!asset) {
       throw new HttpException('Актив не найден', HttpStatus.NOT_FOUND)
+    }
+    
+    const portfolios = await this.portfolioRepository.findAll()
+    for (const portfolio of portfolios) {
+      await this.transactionsService.deleteAllLinkedTransactions({
+        portfolioId: portfolio.dataValues.id, 
+        assetId: asset.dataValues.id
+      })
     }
 
     await this.portfolioAssetRepository.destroy({
@@ -141,7 +172,7 @@ export class AssetsService {
   }
 
   async removeAssetFromPortfolio(dto: RemoveAssetFromPortfolioDto) {
-    const { portfolioId, assetTicker } = dto
+    const { portfolioId, assetTicker, removeAllLinkedTransactions } = dto
 
     const asset = await this.assetRepository.findOne({where: {ticker: assetTicker}})
     if (!asset) {
@@ -151,6 +182,10 @@ export class AssetsService {
     const portfolioAsset = await this.portfolioAssetRepository.findOne({where: {portfolioId, assetId: asset.dataValues.id}})
     if (!portfolioAsset) {
       throw new HttpException('В портфеле нет такого актива', HttpStatus.NOT_FOUND)
+    }
+
+    if (removeAllLinkedTransactions) {
+      await this.transactionsService.deleteAllLinkedTransactions({portfolioId, assetId: asset.dataValues.id})
     }
 
     await portfolioAsset.destroy()

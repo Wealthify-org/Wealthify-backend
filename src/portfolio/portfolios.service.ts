@@ -2,7 +2,6 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
 import { Portfolio } from './portfolios.model';
 import { CreatePortfolioDto } from './dto/create-portfolio.dto';
-import { where } from 'sequelize';
 import { PortfolioAssets } from 'src/assets/portfolio-assets.model';
 
 @Injectable()
