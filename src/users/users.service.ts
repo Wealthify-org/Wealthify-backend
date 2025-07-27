@@ -10,7 +10,13 @@ export class UsersService {
               private roleService: RolesService) {}
 
   async createUser(dto: CreateUserDto) {
-    const existingUser = await this.getUserByEmail(dto.email)
+    const { email } = dto
+    const existingUser = await this.userRepository.findOne({
+      where: {email},
+      include: {all: true, nested: true}, 
+      nest: true, 
+      raw: true
+    })
 
     if (existingUser) {
       throw new HttpException('User with such email already exists', HttpStatus.BAD_REQUEST)
@@ -20,8 +26,9 @@ export class UsersService {
     const role = await this.roleService.getRoleByValue('USER')
     
     if (!role) {
-      throw new Error("Role 'USER' not found");
+      throw new HttpException('Role \'USER\' not found', HttpStatus.NOT_FOUND);
     }
+
     await user.$set('roles', [role.id])
     user.roles = [role]
     await user.$set('portfolios', [])

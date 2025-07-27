@@ -26,13 +26,13 @@ export class AssetsService {
 
     const asset = await this.assetRepository.findOne({where: {ticker: assetTicker}})
     if (!asset) {
-      throw new HttpException('Актив не найден', HttpStatus.NOT_FOUND)
+      throw new HttpException(`Asset ${assetTicker} not found`, HttpStatus.NOT_FOUND)
     }
 
     const portfolio = await this.portfolioRepository.findByPk(portfolioId)
     
     if (!portfolio) {
-      throw new HttpException('Портфель не найден', HttpStatus.NOT_FOUND)
+      throw new HttpException(`Portfolio ${portfolioId} not found`, HttpStatus.NOT_FOUND)
     }
 
     let portfolioAsset = await this.portfolioAssetRepository.findOne({where: {portfolioId, assetId: asset.id}})
@@ -74,6 +74,12 @@ export class AssetsService {
   }
   
   async createAsset(dto: CreateAssetDto) {
+    const { ticker } = dto
+    const foundAsset = await this.assetRepository.findOne({where: {ticker}})
+    if (foundAsset) {
+      throw new HttpException(`Asset ${ticker} already exists`, HttpStatus.BAD_REQUEST)
+    }
+    
     const asset = await this.assetRepository.create(dto)
     return asset
   }
@@ -88,25 +94,25 @@ export class AssetsService {
 
     const asset = await this.assetRepository.findOne({where: {ticker: assetTicker}})
     if (!asset) {
-      throw new HttpException('Актив не найден', HttpStatus.NOT_FOUND)
+      throw new HttpException(`Asset ${assetTicker} not found`, HttpStatus.NOT_FOUND)
     }
 
     const portfolio = await this.portfolioRepository.findByPk(portfolioId)
     if (!portfolio) {
-      throw new HttpException('Портфель не найден', HttpStatus.NOT_FOUND)
+      throw new HttpException(`Portfolio ${portfolioId} not found`, HttpStatus.NOT_FOUND)
     }
 
     let portfolioAsset = await this.portfolioAssetRepository.findOne({where: {portfolioId, assetId: asset.id}})
     if (!portfolioAsset) {
-      throw new HttpException('Такого актива в портфеле нет', HttpStatus.NOT_FOUND)
+      throw new HttpException(`No such asset ${assetTicker} in portfolio ${portfolioId}`, HttpStatus.NOT_FOUND)
     }
 
     if (quantity <= 0) {
-      throw new HttpException('Количество должны быть больше 0', HttpStatus.BAD_REQUEST)
+      throw new HttpException('Asset quantity should be greater than 0', HttpStatus.BAD_REQUEST)
     }
 
     if (portfolioAsset.dataValues.quantity < quantity) {
-      throw new HttpException('Недостаточно актива для продажи', HttpStatus.BAD_REQUEST)
+      throw new HttpException('Not enough asset to sell', HttpStatus.BAD_REQUEST)
     }
 
     if (portfolioAsset.dataValues.quantity === quantity) {
@@ -118,7 +124,7 @@ export class AssetsService {
 
     if (convertToUsd) {
       if (pricePerUnit <= 0) {
-        throw new HttpException('Укажите корректную цену продаваемого актива', HttpStatus.BAD_REQUEST)
+        throw new HttpException('Asset price should be greater than zero', HttpStatus.BAD_REQUEST)
       }
 
       const usdAmount = quantity * pricePerUnit
@@ -151,7 +157,7 @@ export class AssetsService {
     const asset = await this.assetRepository.findOne({ where: { ticker }})
 
     if (!asset) {
-      throw new HttpException('Актив не найден', HttpStatus.NOT_FOUND)
+      throw new HttpException(`Asset ${ticker} not found`, HttpStatus.NOT_FOUND)
     }
     
     const portfolios = await this.portfolioRepository.findAll()
@@ -168,7 +174,7 @@ export class AssetsService {
 
     await asset.destroy()
 
-    return { message: `Актив ${ticker} и все его связи успешно удалены`}
+    return { message: `Asset ${ticker} and all it's connections were successfully deleted`}
   }
 
   async removeAssetFromPortfolio(dto: RemoveAssetFromPortfolioDto) {
@@ -176,12 +182,12 @@ export class AssetsService {
 
     const asset = await this.assetRepository.findOne({where: {ticker: assetTicker}})
     if (!asset) {
-      throw new HttpException('Такого актива не существует', HttpStatus.NOT_FOUND)
+      throw new HttpException(`Asset ${assetTicker} not found`, HttpStatus.NOT_FOUND)
     }
 
     const portfolioAsset = await this.portfolioAssetRepository.findOne({where: {portfolioId, assetId: asset.dataValues.id}})
     if (!portfolioAsset) {
-      throw new HttpException('В портфеле нет такого актива', HttpStatus.NOT_FOUND)
+      throw new HttpException(`Asset ${assetTicker} not found in portfolio ${portfolioId}`, HttpStatus.NOT_FOUND)
     }
 
     if (removeAllLinkedTransactions) {
@@ -190,6 +196,6 @@ export class AssetsService {
 
     await portfolioAsset.destroy()
 
-    return {message: `Актив ${assetTicker} был успешно удален из портфеля ${portfolioId}`}
+    return {message: `Asset ${assetTicker} was successfully deleted from portfolio ${portfolioId}`}
   }
 }

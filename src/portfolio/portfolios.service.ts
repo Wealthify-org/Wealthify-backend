@@ -23,7 +23,7 @@ export class PortfoliosService {
   async getPortfolioByName(name: string) {
     const portfolio = await this.portfolioRepository.findOne({where: {name}, include: {all: true, nested: true}, nest: true})
     if (!portfolio) {
-      return { message: 'Portfolio with such name doesn\'t exist'}
+      return { message: `Portfolio with such name ${name} doesn\'t exist`}
     }
     return portfolio
   }
@@ -32,13 +32,13 @@ export class PortfoliosService {
     const portfolio = await this.portfolioRepository.findByPk(id)
 
     if (!portfolio) {
-      throw new NotFoundException('Portfolio not found')
+      throw new NotFoundException(`Portfolio ${id} not found`)
     }
 
     await this.portfolioAssetsRepository.destroy({where: {portfolioId: id}})
 
     await this.portfolioRepository.destroy({where: {id}})
 
-    return { message: 'Portfolio was successfully deleted'}
+    return { message: `Portfolio ${id} was successfully deleted`}
   }
 }

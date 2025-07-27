@@ -27,20 +27,22 @@ export class TransactionsService {
   async deleteTransaction(id: number) {
     const transation = await this.transactionRepository.findByPk(id)
     if (!transation) {
-      throw new HttpException('Транзакции с таким айди не существует', HttpStatus.NOT_FOUND)
+      throw new HttpException(`Transaction with id ${id} doesn\'t exist`, HttpStatus.NOT_FOUND)
     }
 
     const portfolioAsset = await this.portfolioAssetRepository.findOne({
       where: { portfolioId: transation.dataValues.portfolioId, assetId: transation.dataValues.assetId }
     })
     if (!portfolioAsset) {
-      throw new HttpException('Такого актива нет в портфеле', HttpStatus.NOT_FOUND)
+      throw new HttpException(
+        `There\'s no asset ${transation.dataValues.assetId} in portfolio ${transation.dataValues.portfolioId}`,
+         HttpStatus.NOT_FOUND)
     }
 
     if (transation.type === 'BUY') {
       const newQuantity = portfolioAsset.dataValues.quantity - transation.dataValues.quantity
-      if (newQuantity < 0) {
-        throw new HttpException('Количество актива не может быть меньше нуля', HttpStatus.BAD_REQUEST)
+      if (newQuantity <= 0) {
+        throw new HttpException('Asset\'s quantity should be greater than zero', HttpStatus.BAD_REQUEST)
       }
 
       const totalCost = portfolioAsset.dataValues.averageBuyPrice * portfolioAsset.dataValues.quantity
@@ -70,13 +72,18 @@ export class TransactionsService {
         totalCost += t.dataValues.quantity * t.dataValues.pricePerUnit
       }
 
-      portfolioAsset.averageBuyPrice = totalQuantity === 0 ? transation.dataValues.pricePerUnit : totalCost / totalQuantity
+      portfolioAsset.averageBuyPrice = totalQuantity === 0 
+      ? transation.dataValues.pricePerUnit 
+      : totalCost / totalQuantity
     }
 
     await portfolioAsset.save()
     await transation.destroy()
 
-    return { message: 'Транзакция была удалена и информация об активе в портфеле обновлена' }
+    return { 
+      message: `Transaction ${id} was deleted and information about asset 
+      ${transation.dataValues.assetId} was updated in portfolio ${transation.dataValues.portfolioId}` 
+    }
   }
 
   async deleteAllLinkedTransactions(dto: DeleteAllLinkedTransactionsDto) {

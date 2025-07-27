@@ -15,7 +15,7 @@ export class AuthService {
   async login(userDto: CreateUserDto) {
     const user = await this.validateUser(userDto)
     if (!user) {
-      throw new UnauthorizedException({message: 'Некорректный адрес электронной почты или пароль'})
+      throw new UnauthorizedException({message: 'Incorrect email or password'})
     }
 
     return this.generateToken(user)
@@ -24,7 +24,7 @@ export class AuthService {
   async registration(userDto: CreateUserDto) {
     const candidate = await this.userService.getUserByEmail(userDto.email)
     if (candidate) {
-      throw new HttpException('Пользователь с таким email уже существует', HttpStatus.BAD_REQUEST)
+      throw new HttpException('User with such email already exists', HttpStatus.BAD_REQUEST)
     }
 
     const hashPassword = await bcrypt.hash(userDto.password, 5)
@@ -43,7 +43,7 @@ export class AuthService {
     const user = await this.userService.getUserByEmail(userDto.email)
 
     if (!user) {
-      throw new UnauthorizedException({message: 'Некорректный адрес электронной почты или пароль'})
+      throw new UnauthorizedException({message: 'Incorrect email or password'})
     }
     const passwordEquals = await bcrypt.compare(userDto.password, user.password)
     if (passwordEquals) {
