@@ -17,18 +17,18 @@ export class Portfolio extends Model<Portfolio, PortfolioCreationAttrs> {
   declare id: number
 
   @Column({type: DataType.STRING, unique: false, allowNull: false})
-  name: string 
+  declare name: string 
   
   @Column({type: DataType.ENUM(...Object.values(PortfolioType)), allowNull: false})
-  type: PortfolioType
+  declare type: PortfolioType
 
   @BelongsToMany(() => Asset, () => PortfolioAssets)
-  assets: Asset[]
+  declare assets: Asset[]
 
   @ForeignKey(() => User)
   @Column({type: DataType.INTEGER, allowNull: false})
-  userId: number
+  declare userId: number
 
   @HasMany(() => Transaction)
-  transactions: Transaction[]
+  declare transactions: Transaction[]
 }

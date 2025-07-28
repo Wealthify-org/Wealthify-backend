@@ -20,21 +20,21 @@ export class Transaction extends Model<Transaction, TransactionCreationAttrs> {
 
   @ForeignKey(() => Portfolio)
   @Column({ type: DataType.INTEGER, allowNull: false })
-  portfolioId: number
+  declare portfolioId: number
 
   @ForeignKey(() => Asset)
   @Column({ type: DataType.INTEGER, allowNull: false })
-  assetId: number
+  declare assetId: number
 
   @Column({ type: DataType.ENUM(...Object.values(TransactionType)), allowNull: false })
-  type: TransactionType
+  declare type: TransactionType
 
   @Column({ type: DataType.DOUBLE, allowNull: false })
-  quantity: number
+  declare quantity: number
 
   @Column({ type: DataType.DOUBLE, allowNull: false })
-  pricePerUnit: number
+  declare pricePerUnit: number
 
   @Column({ type: DataType.DATE, allowNull: false, defaultValue: DataType.NOW })
-  date: Date
+  declare date: Date
 }

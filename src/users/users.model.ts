@@ -19,19 +19,19 @@ export class User extends Model<User, UserCreationAttrs> {
 
   @ApiProperty({example: 'outea7t', description: 'Никнейм пользователя'})
   @Column({type: DataType.STRING, unique: true, allowNull: false})
-  username: string
+  declare username: string
 
   @ApiProperty({example: 'user@mail.ru', description: 'Почта пользователя'})
   @Column({type: DataType.STRING, unique: true, allowNull: false})
-  email: string
+  declare email: string
 
   @ApiProperty({example: 'asdfa123', description: 'Пароль пользователя'})
   @Column({type: DataType.STRING, allowNull: false})
-  password: string
+  declare password: string
 
   @BelongsToMany(() => Role, () => UserRoles)
-  roles: Role[]
+  declare roles: Role[]
 
   @HasMany(() => Portfolio)
-  portfolios: Portfolio[]
+  declare portfolios: Portfolio[]
 }

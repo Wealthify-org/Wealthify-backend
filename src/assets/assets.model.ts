@@ -16,14 +16,14 @@ export class Asset extends Model<Asset, AssetCreationAttrs> {
   declare id: number
 
   @Column({type: DataType.STRING, unique: true, allowNull: false})
-  name: string
+  declare name: string
 
   @Column({type: DataType.STRING, unique: true, allowNull: false})
-  ticker: string
+  declare ticker: string
 
   @Column({type: DataType.ENUM(...Object.values(AssetType)), allowNull: false})
-  type: AssetType
+  declare type: AssetType
 
   @BelongsToMany(() => Portfolio, () => PortfolioAssets)
-  portfolios: Portfolio[]
+  declare portfolios: Portfolio[]
 }
