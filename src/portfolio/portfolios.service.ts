@@ -3,11 +3,13 @@ import { InjectModel } from '@nestjs/sequelize';
 import { Portfolio } from './portfolios.model';
 import { CreatePortfolioDto } from './dto/create-portfolio.dto';
 import { PortfolioAssets } from 'src/assets/portfolio-assets.model';
+import { Transaction } from 'src/transactions/transactions.model';
 
 @Injectable()
 export class PortfoliosService {
   constructor(@InjectModel(Portfolio) private portfolioRepository: typeof Portfolio,
-              @InjectModel(PortfolioAssets) private portfolioAssetsRepository: typeof PortfolioAssets
+              @InjectModel(PortfolioAssets) private portfolioAssetsRepository: typeof PortfolioAssets,
+              @InjectModel(Transaction) private transactionRepository: typeof Transaction
             ) {}
 
   async createPortfolio(dto: CreatePortfolioDto) {
@@ -34,6 +36,8 @@ export class PortfoliosService {
     if (!portfolio) {
       throw new NotFoundException(`Portfolio ${id} not found`)
     }
+
+    await this.transactionRepository.destroy({where: {portfolioId: id}})
 
     await this.portfolioAssetsRepository.destroy({where: {portfolioId: id}})
 

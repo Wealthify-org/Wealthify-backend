@@ -7,6 +7,7 @@ import { Asset } from 'src/assets/assets.model';
 import { PortfolioAssets } from 'src/assets/portfolio-assets.model';
 import { AssetsModule } from 'src/assets/assets.module';
 import { Transaction } from 'src/transactions/transactions.model';
+import { TransactionsModule } from 'src/transactions/transactions.module';
 
 @Module({
   controllers: [PortfoliosController],
