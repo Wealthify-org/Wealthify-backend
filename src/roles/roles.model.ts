@@ -23,6 +23,7 @@ export class Role extends Model<Role, RoleCreationAttrs> {
   @Column({type: DataType.STRING, allowNull: false})
   declare description: string
 
+  @ApiProperty({ type: () => [User], description: 'Пользователи, которым назначена эта роль' })
   @BelongsToMany(() => User, () => UserRoles)
   declare users: User[]
 }

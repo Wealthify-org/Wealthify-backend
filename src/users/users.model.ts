@@ -29,9 +29,11 @@ export class User extends Model<User, UserCreationAttrs> {
   @Column({type: DataType.STRING, allowNull: false})
   declare password: string
 
+  @ApiProperty({ type: () => [Role], description: 'Список ролей, назначенных пользователю' })
   @BelongsToMany(() => Role, () => UserRoles)
   declare roles: Role[]
 
+  @ApiProperty({ type: () => [Portfolio], description: 'Список инвестиционных портфелей пользователя' })
   @HasMany(() => Portfolio)
   declare portfolios: Portfolio[]
 }

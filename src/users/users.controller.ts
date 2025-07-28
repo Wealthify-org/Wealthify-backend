@@ -1,7 +1,7 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpStatus, Post } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { User } from './users.model';
 
 @ApiTags('Пользователи')
@@ -9,16 +9,19 @@ import { User } from './users.model';
 export class UsersController {
   constructor(private usersService: UsersService) {}
 
-  @ApiOperation({summary: 'Создание пользователя'})
-  @ApiResponse({status: 200, type: User})
   @Post()
+  @ApiOperation({ summary: 'Создание нового пользователя' })
+  @ApiResponse({ status: HttpStatus.CREATED, description: 'Пользователь успешно создан', type: User })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Пользователь с таким email уже существует' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Роль USER не найдена' })
+  @ApiBody({ type: CreateUserDto })
   create(@Body() userDto: CreateUserDto) {
     return this.usersService.createUser(userDto)
   }
 
-  @ApiOperation({summary: 'Получить всех пользователей'})
-  @ApiResponse({status: 200, type: [User]})
   @Get()
+  @ApiOperation({ summary: 'Получение всех пользователей' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Список всех пользователей', type: [User] })
   getAll() {
     return this.usersService.getAllUsers()
   }

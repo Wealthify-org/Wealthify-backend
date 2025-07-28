@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { RolesService } from './roles.service';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { Role } from './roles.model';
 
@@ -9,16 +9,20 @@ import { Role } from './roles.model';
 export class RolesController {
   constructor(private roleService: RolesService) {}
 
-  @ApiOperation({summary: 'Создание роли'})
-  @ApiResponse({status: 201, type: Role})
   @Post()
+  @ApiOperation({ summary: 'Создание новой роли' })
+  @ApiBody({ type: CreateRoleDto, description: 'DTO с данными новой роли (value и description)' })
+  @ApiResponse({ status: 201, description: 'Роль успешно создана', type: Role })
+  @ApiResponse({ status: 400, description: 'Роль с таким значением уже существует' })
   create(@Body() dto: CreateRoleDto) {
     return this.roleService.createRole(dto)
   }
 
-  @ApiOperation({summary: 'Получить роль по ее значению'})
-  @ApiResponse({status: 200, type: Role})
   @Get('/:value')
+  @ApiOperation({ summary: 'Получить роль по значению (value)' })
+  @ApiParam({ name: 'value', type: String, example: 'ADMIN', description: 'Значение роли для поиска' })
+  @ApiResponse({ status: 200, description: 'Роль найдена', type: Role })
+  @ApiResponse({ status: 400, description: 'Роль с таким значением не найдена' })
   getByValue(@Param('value') value: string) {
     return this.roleService.getRoleByValue(value)
   }

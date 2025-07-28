@@ -86,6 +86,11 @@ export class AssetsService {
 
   async getAssetByTicker(ticker: string) {
     const asset = await this.assetRepository.findOne({where: {ticker}})
+
+    if (!asset) {
+      throw new HttpException(`There\'s no such asset as ${ticker}`, HttpStatus.NOT_FOUND)
+    }
+
     return asset
   }
 
