@@ -9,7 +9,7 @@ export class RolesService {
 
   async createRole(dto: CreateRoleDto) {
     const { value } = dto
-    const foundRole = await this.roleRepository.findOne({where: {value}})
+    const foundRole = await this.roleRepository.findOne({ where: { value } })
     if (foundRole) {
       throw new HttpException(`Role with value ${value} already exists`, HttpStatus.BAD_REQUEST)
     }
@@ -19,12 +19,29 @@ export class RolesService {
   }
 
   async getRoleByValue(value: string) {
-    const role = await this.roleRepository.findOne({where: {value}})
+    const role = await this.roleRepository.findOne({ where: { value } })
     if (!role) {
-      throw new HttpException(`Role with value ${value} doesn\'t exist`, HttpStatus.BAD_REQUEST)
+      throw new HttpException(`Role with value ${value} doesn\'t exist`, HttpStatus.NOT_FOUND)
     }
     
     return role
+  }
+
+  async getAllRoles() {
+    const roles = await this.roleRepository.findAll()
+    
+    return roles
+  }
+
+  async deleteRoleByValue(value: string) {
+    const role = await this.roleRepository.findOne({ where: { value } })
+    if (!role) {
+      throw new HttpException(`Role with value ${value} doesn\'t exist`, HttpStatus.NOT_FOUND)
+    }
+
+    await role.destroy()
+
+    return { message: `Role with value ${value} was successfully deleted` }
   }
 
 }

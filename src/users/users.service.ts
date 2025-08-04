@@ -3,6 +3,7 @@ import { User } from './users.model';
 import { InjectModel } from '@nestjs/sequelize';
 import { CreateUserDto } from './dto/create-user.dto';
 import { RolesService } from 'src/roles/roles.service';
+import { AddRoleDto } from './dto/add-role.dto';
 
 @Injectable()
 export class UsersService {
@@ -42,7 +43,35 @@ export class UsersService {
   }
 
   async getUserByEmail(email: string) {
-    const user = this.userRepository.findOne({where: {email}, include: {all: true, nested: true}, nest: true, raw: true})
+    const user = this.userRepository.findOne({where: {email}, include: {all: true, nested: true}})
     return user
+  }
+
+  async addRoleToUser(dto: AddRoleDto) {
+    const { userId, value } = dto
+    const user = await this.userRepository.findByPk(
+      userId, {include: {all: true, nested: true}}
+     )
+
+    if (!user) {
+      throw new HttpException(`User with id: ${userId} doesn't exist`, HttpStatus.NOT_FOUND)
+    }
+
+    const role = await this.roleService.getRoleByValue(value)
+    if (!role) {
+      throw new HttpException('Role \'USER\' not found', HttpStatus.NOT_FOUND);
+    }
+
+    console.log(user.dataValues)
+
+    const hasRole = user.dataValues.roles.some(role => role.value === value)
+    if (hasRole) {
+      throw new HttpException(`User has already got role ${value}`, HttpStatus.BAD_REQUEST)
+    }
+
+    await user.$add('roles', role.id)
+
+
+    return { message: `Role ${value} was successfully added to user ${userId}` }
   }
 }

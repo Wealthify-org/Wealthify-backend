@@ -1,6 +1,6 @@
 import { Column, DataType, ForeignKey, Model, Table } from "sequelize-typescript";
 import { Asset } from "src/assets/assets.model";
-import { Portfolio } from "src/portfolio/portfolios.model";
+import { Portfolio } from "src/portfolios/portfolios.model";
 import { TransactionType } from "./transaction-type.enum";
 import { ApiProperty } from "@nestjs/swagger";
 

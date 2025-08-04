@@ -1,6 +1,6 @@
 import { Model, Column, DataType, ForeignKey, Table } from "sequelize-typescript";
 import { Asset } from "./assets.model";
-import { Portfolio } from "src/portfolio/portfolios.model";
+import { Portfolio } from "src/portfolios/portfolios.model";
 import { ApiProperty } from "@nestjs/swagger";
 
 interface PortfolioAssetCreationAttrs {

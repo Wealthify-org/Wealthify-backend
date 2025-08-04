@@ -5,7 +5,7 @@ import { CreateAssetDto } from './dto/create-asset.dto';
 import { PortfolioAssets } from './portfolio-assets.model';
 
 import { AddAssetToPortfolioDto } from './dto/add-asset-to-portfolio.dto';
-import { Portfolio } from 'src/portfolio/portfolios.model';
+import { Portfolio } from 'src/portfolios/portfolios.model';
 import { SellAssetDto } from './dto/sell-asset.dto';
 import { RemoveAssetFromPortfolioDto } from './dto/remove-asset-from-portfolio.dto';
 import { TransactionsService } from 'src/transactions/transactions.service';

@@ -7,7 +7,7 @@ import { AuthModule } from 'src/auth/auth.module';
 import { Role } from 'src/roles/roles.model';
 import { UserRoles } from 'src/roles/user-roles.model';
 import { RolesModule } from 'src/roles/roles.module';
-import { Portfolio } from 'src/portfolio/portfolios.model';
+import { Portfolio } from 'src/portfolios/portfolios.model';
 
 @Module({
   controllers: [UsersController],
