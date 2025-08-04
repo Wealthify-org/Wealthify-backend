@@ -1,10 +1,13 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { AssetsService } from './assets.service';
 import { CreateAssetDto } from './dto/create-asset.dto';
 import { AddAssetToPortfolioDto } from './dto/add-asset-to-portfolio.dto';
 import { SellAssetDto } from './dto/sell-asset.dto';
 import { RemoveAssetFromPortfolioDto } from './dto/remove-asset-from-portfolio.dto';
 import { ApiBody, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
+import { Roles } from 'src/common/decorators/roles-auth.decorator';
+import { RolesGuard } from 'src/common/guards/roles.guard';
 
 @ApiTags('Активы')
 @Controller('assets')
@@ -12,6 +15,9 @@ export class AssetsController {
   constructor(private assetsService: AssetsService) {}
 
   @Post()
+  @UseGuards(JwtAuthGuard)
+  @Roles('ADMIN')
+  @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Создание нового актива' })
   @ApiResponse({ status: 201, description: 'Актив успешно создан' })
   @ApiResponse({ status: 400, description: 'Актив с таким тикером уже существует' })
@@ -21,6 +27,7 @@ export class AssetsController {
   }
 
   @Post('/add-to-portfolio')
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Добавить актив в портфель' })
   @ApiResponse({ status: 200, description: 'Актив добавлен или обновлён в портфеле' })
   @ApiResponse({ status: 404, description: 'Актив или портфель не найдены' })
@@ -30,6 +37,7 @@ export class AssetsController {
   }
 
   @Get(':ticker')
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Получить актив по тикеру' })
   @ApiResponse({ status: 200, description: 'Актив найден' })
   @ApiResponse({ status: 404, description: 'Актив не найден' })
@@ -39,6 +47,7 @@ export class AssetsController {
   }
 
   @Patch()
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Продать актив из портфеля' })
   @ApiResponse({ status: 200, description: 'Продажа выполнена успешно' })
   @ApiResponse({ status: 400, description: 'Неверное количество или цена продажи' })
@@ -49,6 +58,7 @@ export class AssetsController {
   }
 
   @Delete('remove-from-portfolio')
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Удалить актив из портфеля' })
   @ApiResponse({ status: 200, description: 'Актив удалён из портфеля' })
   @ApiResponse({ status: 404, description: 'Актив или портфель не найдены' })
@@ -58,6 +68,9 @@ export class AssetsController {
   }
 
   @Delete(':ticker')
+  @UseGuards(JwtAuthGuard)
+  @Roles('ADMIN')
+  @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Удалить актив по тикеру' })
   @ApiResponse({ status: 200, description: 'Актив и все связанные записи успешно удалены' })
   @ApiResponse({ status: 404, description: 'Актив не найден' })
