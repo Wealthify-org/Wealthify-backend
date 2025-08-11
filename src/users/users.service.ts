@@ -47,11 +47,16 @@ export class UsersService {
     return user
   }
 
+  async getUserById(userId: number) {
+    const user = this.userRepository.findByPk(userId, {include: {all: true, nested: true}})
+    return user
+  }
+
   async addRoleToUser(dto: AddRoleDto) {
     const { userId, value } = dto
     const user = await this.userRepository.findByPk(
       userId, {include: {all: true, nested: true}}
-     )
+    )
 
     if (!user) {
       throw new HttpException(`User with id: ${userId} doesn't exist`, HttpStatus.NOT_FOUND)

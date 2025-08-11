@@ -45,4 +45,7 @@ export class UsersController {
   addRole(@Body() dto: AddRoleDto) {
     return this.usersService.addRoleToUser(dto)
   }
+
+  // @Post('refresh')
+  // refresh(@Body(''))
 }

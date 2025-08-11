@@ -14,6 +14,8 @@ import { Portfolio } from "./portfolios/portfolios.model";
 import { PortfolioAssets } from "./assets/portfolio-assets.model";
 import { TransactionsModule } from './transactions/transactions.module';
 import { Transaction } from "./transactions/transactions.model";
+import { RefreshToken } from "./auth/refresh-token.model";
+import { ResetToken } from "./auth/reset-token-model";
 
 @Module({
   imports: [
@@ -27,7 +29,7 @@ import { Transaction } from "./transactions/transactions.model";
       username: process.env.POSTGRES_USER,
       password: process.env.POSTGRES_PASSWORD,
       database: process.env.POSTGRES_DB,
-      models: [User, Role, UserRoles, Asset, Portfolio, PortfolioAssets, Transaction],
+      models: [User, RefreshToken, ResetToken, Role, UserRoles, Asset, Portfolio, PortfolioAssets, Transaction],
       autoLoadModels: true,
       synchronize: true, // включи это временно
       sync: { alter: true }

@@ -1,8 +1,12 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Post, Put, Req, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { CreateUserDto } from 'src/users/dto/create-user.dto';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { dot } from 'node:test/reporters';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { AuthGuard } from '@nestjs/passport';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 
 @ApiTags('Авторизация')
 @Controller('auth')
@@ -23,5 +27,29 @@ export class AuthController {
   @Post('/registration')
   registration(@Body() userDto: CreateUserDto) {
     return this.authService.registration(userDto)
+  }
+
+  @Post('refresh')
+  refreshTokens(@Body() refreshTokenDto: RefreshTokenDto) {
+    // return this.authService.refreshTokens(refreshTokenDto)
+  }
+
+  @UseGuards(AuthGuard)
+  @Put('change-password')
+  changePassword(@Body() changePasswordDto: ChangePasswordDto, @Req() req) {
+    // return this.authService.changePassword(
+    //   req.userId,
+    //   changePasswordDto
+    // )
+  }
+
+  @Post('forgot-password')
+  forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
+    // return this.authService.forgotPassword(forgotPasswordDto)
+  }
+
+  @Put('reset-password')
+  resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
+    // return this.authService.resetPassword(resetPasswordDto)
   }
 }
