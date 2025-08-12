@@ -5,8 +5,6 @@ import { ApiBody, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/s
 import { Portfolio } from './portfolios.model';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 
-console.log('PORTFOLIOS: RolesGuard type:', typeof JwtAuthGuard);
-
 @ApiTags('Портфели')
 @Controller('portfolios')
 export class PortfoliosController {

@@ -10,8 +10,6 @@ import { Transaction } from 'src/transactions/transactions.model';
 import { AuthModule } from 'src/auth/auth.module';
 import { RolesModule } from 'src/roles/roles.module';
 
-console.log('[RolesGuard] type:', typeof AuthModule, typeof RolesModule);
-
 @Module({
   controllers: [PortfoliosController],
   providers: [PortfoliosService],
