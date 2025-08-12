@@ -47,22 +47,27 @@ export class AuthService {
   }
 
   async refreshTokens(refreshTokenDto: RefreshTokenDto) {
-    const { refreshToken } = refreshTokenDto
+    const { refreshToken, userId } = refreshTokenDto
 
-    const token = await this.refreshTokenRepository.findOne({
+    const tokenRow = await this.refreshTokenRepository.findOne({
       where: {
-        token: refreshToken, 
+        userId,
         expiryDate: {
           [Op.gte]: new Date()
         }
       }
     })
 
-    if (!token) {
+    if (!tokenRow) {
       throw new UnauthorizedException('Refresh token is invalid')
     }
 
-    return await this.generateUserTokens(token.dataValues.userId)
+    const isTokensEqual = await bcrypt.compare(refreshToken, tokenRow.dataValues.token)
+    if (!isTokensEqual) {
+      throw new UnauthorizedException('Invalid refresh token')
+    }
+
+    return await this.generateUserTokens(tokenRow.dataValues.userId)
   }
 
   async changePassword(userId: number, changePasswordDto: ChangePasswordDto) {
@@ -91,9 +96,11 @@ export class AuthService {
       expiryDate.setHours(expiryDate.getHours() + 1)
 
       const resetToken = uuidv4()
+      const hashedResetToken = await bcrypt.hash(resetToken, this.hashComplexity)
+
       await this.resetTokenRepository.upsert({
-        token: resetToken, 
         userId: user.dataValues.id,
+        token: resetToken, 
         expiryDate
       })
 
@@ -104,21 +111,26 @@ export class AuthService {
   }
 
   async resetPassword(resetPasswordDto: ResetPasswordDto) {
-    const { resetToken, newPassword } = resetPasswordDto
-    const token = await this.resetTokenRepository.findOne({
+    const { resetToken, newPassword, userId } = resetPasswordDto
+    const tokenRow = await this.resetTokenRepository.findOne({
       where: {
-        token: resetToken,
+        userId,
         expiryDate: {
           [Op.gte]: new Date()
         }
       }
     })
 
-    if (!token) {
+    if (!tokenRow) {
       throw new UnauthorizedException('Invalid link')
     }
 
-    const user = await this.userService.getUserById(token.dataValues.userId)
+    const isTokensEqual = await bcrypt.compare(resetToken, tokenRow.dataValues.token)
+    if (!isTokensEqual) {
+      throw new UnauthorizedException('Invalid link');
+    }
+
+    const user = await this.userService.getUserById(tokenRow.dataValues.userId)
     if (!user) {
       throw new InternalServerErrorException()
     }
@@ -126,14 +138,17 @@ export class AuthService {
     user.password = await bcrypt.hash(newPassword, this.hashComplexity) 
     await user.save()
 
-    await token.destroy()
+    await tokenRow.destroy()
   }
 
   private async generateUserTokens(userId: number) {
     
-    const accessToken = await this.jwtService.sign({ userId }, { expiresIn: '15m' })
-    const refreshToken =  uuidv4()
-    await this.storeRefreshToken(refreshToken, userId)
+    const accessToken = this.jwtService.sign({ userId }, { expiresIn: '15m' })
+    const refreshToken = uuidv4()
+
+    const hashedRefreshToken = await bcrypt.hash(refreshToken, this.hashComplexity)
+
+    await this.storeRefreshToken(hashedRefreshToken, userId)
 
     return {
       accessToken,

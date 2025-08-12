@@ -31,25 +31,25 @@ export class AuthController {
 
   @Post('refresh')
   refreshTokens(@Body() refreshTokenDto: RefreshTokenDto) {
-    // return this.authService.refreshTokens(refreshTokenDto)
+    return this.authService.refreshTokens(refreshTokenDto)
   }
 
   @UseGuards(AuthGuard)
   @Put('change-password')
   changePassword(@Body() changePasswordDto: ChangePasswordDto, @Req() req) {
-    // return this.authService.changePassword(
-    //   req.userId,
-    //   changePasswordDto
-    // )
+    return this.authService.changePassword(
+      req.userId,
+      changePasswordDto
+    )
   }
 
   @Post('forgot-password')
   forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
-    // return this.authService.forgotPassword(forgotPasswordDto)
+    return this.authService.forgotPassword(forgotPasswordDto)
   }
 
   @Put('reset-password')
   resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
-    // return this.authService.resetPassword(resetPasswordDto)
+    return this.authService.resetPassword(resetPasswordDto)
   }
 }
