@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { PortfoliosController } from './portfolios.controller';
 import { PortfoliosService } from './portfolios.service';
 import { SequelizeModule } from '@nestjs/sequelize';
@@ -7,14 +7,18 @@ import { Asset } from 'src/assets/assets.model';
 import { PortfolioAssets } from 'src/assets/portfolio-assets.model';
 import { AssetsModule } from 'src/assets/assets.module';
 import { Transaction } from 'src/transactions/transactions.model';
-import { TransactionsModule } from 'src/transactions/transactions.module';
+import { AuthModule } from 'src/auth/auth.module';
+import { RolesModule } from 'src/roles/roles.module';
+
+console.log('[RolesGuard] type:', typeof AuthModule, typeof RolesModule);
 
 @Module({
   controllers: [PortfoliosController],
   providers: [PortfoliosService],
   imports: [
     SequelizeModule.forFeature([Portfolio, Asset, PortfolioAssets, Transaction]),
-    AssetsModule
+    AssetsModule,
+    AuthModule
   ],
   exports: [
     PortfoliosService

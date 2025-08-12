@@ -7,6 +7,8 @@ import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { Roles } from 'src/common/decorators/roles-auth.decorator';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 
+console.log('TRANSACTIONS: RolesGuard type:', typeof RolesGuard, typeof JwtAuthGuard);
+
 @ApiTags('Транзакции')
 @Controller('transactions')
 export class TransactionsController {

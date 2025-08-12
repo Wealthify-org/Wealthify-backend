@@ -9,13 +9,15 @@ import { UserRoles } from 'src/roles/user-roles.model';
 import { RolesModule } from 'src/roles/roles.module';
 import { Portfolio } from 'src/portfolios/portfolios.model';
 
+console.log('[RolesGuard] type:', typeof AuthModule, typeof RolesModule);
+
 @Module({
   controllers: [UsersController],
   providers: [UsersService],
   imports: [
     SequelizeModule.forFeature([User, Role, UserRoles, Portfolio]),
-    forwardRef(() => AuthModule),
-    RolesModule
+    RolesModule,
+    forwardRef(() => AuthModule)
   ],
   exports: [
     UsersService,

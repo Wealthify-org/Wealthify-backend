@@ -1,12 +1,14 @@
-import { Body, Controller, Post, Put, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, HttpStatus, Post, Put, Req, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { CreateUserDto } from 'src/users/dto/create-user.dto';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
-import { AuthGuard } from '@nestjs/passport';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
+import { LoginDto } from './dto/login.dto';
+
 
 @ApiTags('Авторизация')
 @Controller('auth')
@@ -14,27 +16,35 @@ export class AuthController {
   constructor(private authService: AuthService) {}
 
   @ApiOperation({summary: 'Вход в аккаунт'})
-  @ApiResponse({status: 200, description: 'Успешный вход', type: String})
-  @ApiResponse({status: 401, description: 'Неверный email или пароль'})
+  @ApiResponse({status: HttpStatus.OK, description: 'Успешный вход', type: String})
+  @ApiResponse({status: HttpStatus.UNAUTHORIZED, description: 'Неверный email или пароль'})
   @Post('/login')
-  login(@Body() userDto: CreateUserDto) {
+  login(@Body() userDto: LoginDto) {
     return this.authService.login(userDto)
   }
 
   @ApiOperation({summary: 'Регистрация нового аккаунта'})
-  @ApiResponse({status: 201, description: 'Регистрация прошла успешно', type: String})
-  @ApiResponse({status: 400, description: 'Пользователь с таким email уже существует'})
+  @ApiResponse({status: HttpStatus.CREATED, description: 'Регистрация прошла успешно', type: String})
+  @ApiResponse({status: HttpStatus.BAD_REQUEST, description: 'Пользователь с таким email уже существует'})
   @Post('/registration')
   registration(@Body() userDto: CreateUserDto) {
     return this.authService.registration(userDto)
   }
 
+  @ApiOperation({summary: 'Обновление токенов'})
+  @ApiResponse({status: HttpStatus.OK, description: 'Обновление прошло успешно'})
+  @ApiResponse({status: HttpStatus.UNAUTHORIZED, description: 'Рефреш токены не совпадают'})
+  @ApiResponse({status: HttpStatus.INTERNAL_SERVER_ERROR, description: 'Пользователя не удалось найти'})
   @Post('refresh')
   refreshTokens(@Body() refreshTokenDto: RefreshTokenDto) {
     return this.authService.refreshTokens(refreshTokenDto)
   }
 
-  @UseGuards(AuthGuard)
+  @ApiOperation({summary: 'Cмена пароля'})
+  @ApiResponse({status: HttpStatus.OK, description: 'Смена пароля прошла успешно'})
+  @ApiResponse({status: HttpStatus.NOT_FOUND, description: 'Пользователь не найден'})
+  @ApiResponse({status: HttpStatus.UNAUTHORIZED, description: 'Пароль введен неверно'})
+  @UseGuards(JwtAuthGuard)
   @Put('change-password')
   changePassword(@Body() changePasswordDto: ChangePasswordDto, @Req() req) {
     return this.authService.changePassword(
@@ -43,11 +53,16 @@ export class AuthController {
     )
   }
 
+  @ApiOperation({summary: 'Отсылает пользователю письмо (если он существует) с ссылкой на восстановление пароля'})
+  @ApiResponse({status: HttpStatus.OK, description: 'Письпо успешно отправлено пользователю (если он существует)'})
   @Post('forgot-password')
   forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
     return this.authService.forgotPassword(forgotPasswordDto)
   }
 
+  @ApiOperation({summary: 'Восстановление пароля'})
+  @ApiResponse({status: HttpStatus.UNAUTHORIZED, description: 'Действие токена истекло или он не найден'})
+  @ApiResponse({status: HttpStatus.INTERNAL_SERVER_ERROR, description: 'Пользователь, владеющий токеном не найден'})
   @Put('reset-password')
   resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
     return this.authService.resetPassword(resetPasswordDto)

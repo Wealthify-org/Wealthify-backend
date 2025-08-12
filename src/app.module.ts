@@ -23,7 +23,7 @@ import { ResetToken } from "./auth/reset-token-model";
       envFilePath: `.${process.env.NODE_ENV}.env`
     }),
     SequelizeModule.forRoot({
-       dialect: 'postgres',
+      dialect: 'postgres',
       host: process.env.POSTGRES_HOST,
       port: Number(process.env.POSTGRES_PORT),
       username: process.env.POSTGRES_USER,

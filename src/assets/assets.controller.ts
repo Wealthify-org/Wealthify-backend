@@ -15,9 +15,8 @@ export class AssetsController {
   constructor(private assetsService: AssetsService) {}
 
   @Post()
-  @UseGuards(JwtAuthGuard)
   @Roles('ADMIN')
-  @UseGuards(RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({ summary: 'Создание нового актива' })
   @ApiResponse({ status: 201, description: 'Актив успешно создан' })
   @ApiResponse({ status: 400, description: 'Актив с таким тикером уже существует' })
@@ -68,9 +67,8 @@ export class AssetsController {
   }
 
   @Delete(':ticker')
-  @UseGuards(JwtAuthGuard)
   @Roles('ADMIN')
-  @UseGuards(RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({ summary: 'Удалить актив по тикеру' })
   @ApiResponse({ status: 200, description: 'Актив и все связанные записи успешно удалены' })
   @ApiResponse({ status: 404, description: 'Актив не найден' })

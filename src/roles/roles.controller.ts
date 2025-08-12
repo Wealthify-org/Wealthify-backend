@@ -7,6 +7,8 @@ import { Roles } from 'src/common/decorators/roles-auth.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 
+console.log('ROLES: RolesGuard type:', typeof RolesGuard, typeof JwtAuthGuard);
+
 @ApiTags('Роли')
 @Controller('roles')
 export class RolesController {

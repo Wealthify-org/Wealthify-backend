@@ -8,6 +8,8 @@ import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { Roles } from 'src/common/decorators/roles-auth.decorator';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 
+console.log('USERS: RolesGuard type:', typeof RolesGuard, typeof JwtAuthGuard);
+
 @ApiTags('Пользователи')
 @Controller('users')
 export class UsersController {
@@ -46,6 +48,4 @@ export class UsersController {
     return this.usersService.addRoleToUser(dto)
   }
 
-  // @Post('refresh')
-  // refresh(@Body(''))
 }

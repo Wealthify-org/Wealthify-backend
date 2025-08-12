@@ -1,17 +1,17 @@
-import { CanActivate, ExecutionContext, HttpException, HttpStatus, Inject, UnauthorizedException } from "@nestjs/common";
+import { CanActivate, ExecutionContext, HttpException, HttpStatus, Injectable, UnauthorizedException } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import { JwtService } from "@nestjs/jwt";
 import { Observable } from "rxjs";
 import { ROLES_KEY } from "../decorators/roles-auth.decorator";
+import { User } from "src/users/users.model";
+import { UserPayload } from "../types/user-payload.type";
 
-
+@Injectable()
 export class RolesGuard implements CanActivate {
   constructor(
-    @Inject(JwtService) private jwtService: JwtService,
-    @Inject(Reflector) private reflector: Reflector
-  ) {
-    console.log('JwtService:', jwtService);
-  }
+    private jwtService: JwtService,
+    private reflector: Reflector
+  ) {}
 
   canActivate(context: ExecutionContext): boolean | Promise<boolean> | Observable<boolean> {
     try {
@@ -32,10 +32,10 @@ export class RolesGuard implements CanActivate {
         throw new UnauthorizedException({message: 'User is not authorized'})
       }
 
-      const user = this.jwtService.verify(token)
-      req.user = user
+      const payload: UserPayload = this.jwtService.verify(token)
+      req.user = payload.id
 
-      return user.roles.some(role => requiredRoles.includes(role.value))
+      return payload.roles.some(role => requiredRoles.includes(role.value))
     } catch (e) {
       throw new HttpException(`No access ${e}`, HttpStatus.FORBIDDEN)
     }

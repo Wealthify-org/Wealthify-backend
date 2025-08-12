@@ -13,6 +13,9 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { MailService } from 'src/common/services/mail.service';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { LoginDto } from './dto/login.dto';
+import { UserPayload } from 'src/common/types/user-payload.type';
+import { User } from 'src/users/users.model';
 
 @Injectable()
 export class AuthService {
@@ -34,16 +37,16 @@ export class AuthService {
 
     const hashPassword = await bcrypt.hash(userDto.password, this.hashComplexity)
     const user = await this.userService.createUser({...userDto, password: hashPassword})
-    return this.generateUserTokens(user.dataValues.id)
+    return this.generateUserTokens(user)
   }
 
-  async login(userDto: CreateUserDto) {
+  async login(userDto: LoginDto) {
     const user = await this.validateUser(userDto)
     if (!user) {
       throw new UnauthorizedException({message: 'Incorrect email or password'})
     }
 
-    return this.generateUserTokens(user.dataValues.id)
+    return this.generateUserTokens(user)
   }
 
   async refreshTokens(refreshTokenDto: RefreshTokenDto) {
@@ -67,7 +70,12 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token')
     }
 
-    return await this.generateUserTokens(tokenRow.dataValues.userId)
+    const user = await this.userService.getUserById(tokenRow.dataValues.userId)
+    if (!user) {
+      throw new HttpException('User not found', HttpStatus.INTERNAL_SERVER_ERROR)
+    }
+
+    return await this.generateUserTokens(user)
   }
 
   async changePassword(userId: number, changePasswordDto: ChangePasswordDto) {
@@ -100,7 +108,7 @@ export class AuthService {
 
       await this.resetTokenRepository.upsert({
         userId: user.dataValues.id,
-        token: resetToken, 
+        token: hashedResetToken, 
         expiryDate
       })
 
@@ -141,14 +149,18 @@ export class AuthService {
     await tokenRow.destroy()
   }
 
-  private async generateUserTokens(userId: number) {
-    
-    const accessToken = this.jwtService.sign({ userId }, { expiresIn: '15m' })
+  private async generateUserTokens(user: User) {
+    const payload: UserPayload = {
+      id: user.dataValues.id,
+      email: user.dataValues.email,
+      roles: user.dataValues.roles
+    }
+    const accessToken = this.jwtService.sign( payload, { expiresIn: '15m' })
     const refreshToken = uuidv4()
 
     const hashedRefreshToken = await bcrypt.hash(refreshToken, this.hashComplexity)
 
-    await this.storeRefreshToken(hashedRefreshToken, userId)
+    await this.storeRefreshToken(hashedRefreshToken, user.dataValues.id)
 
     return {
       accessToken,
@@ -167,7 +179,7 @@ export class AuthService {
     })
   }
 
-  private async validateUser(userDto: CreateUserDto) {
+  private async validateUser(userDto: LoginDto) {
     const user = await this.userService.getUserByEmail(userDto.email)
 
     if (!user) {
