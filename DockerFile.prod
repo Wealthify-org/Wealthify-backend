@@ -10,7 +10,7 @@ COPY . .
 RUN npm run build
 
 
-# хапуск
+# запуск
 FROM node:20-alpine
 
 WORKDIR /app
