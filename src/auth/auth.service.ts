@@ -34,10 +34,10 @@ export class AuthService {
     if (candidate) {
       throw new HttpException('User with such email already exists', HttpStatus.BAD_REQUEST)
     }
-
     const hashPassword = await bcrypt.hash(userDto.password, this.hashComplexity)
     const user = await this.userService.createUser({...userDto, password: hashPassword})
-    return this.generateUserTokens(user)
+    const tokens = await this.generateUserTokens(user)
+    return { ...tokens, user: this.safeUser(user)}
   }
 
   async login(userDto: LoginDto) {
@@ -45,37 +45,86 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException({message: 'Incorrect email or password'})
     }
-
-    return this.generateUserTokens(user)
+    const tokens = await this.generateUserTokens(user)
+    return { ...tokens, user: this.safeUser(user)}
   }
 
-  async refreshTokens(refreshTokenDto: RefreshTokenDto) {
-    const { refreshToken, userId } = refreshTokenDto
+  // async refreshTokens(refreshTokenDto: RefreshTokenDto) {
+  //   const { refreshToken, userId } = refreshTokenDto
 
-    const tokenRow = await this.refreshTokenRepository.findOne({
+  //   const tokenRow = await this.refreshTokenRepository.findOne({
+  //     where: {
+  //       userId,
+  //       expiryDate: {
+  //         [Op.gte]: new Date()
+  //       }
+  //     }
+  //   })
+
+  //   if (!tokenRow) {
+  //     throw new UnauthorizedException('Refresh token is invalid')
+  //   }
+
+  //   const isTokensEqual = await bcrypt.compare(refreshToken, tokenRow.dataValues.token)
+  //   if (!isTokensEqual) {
+  //     throw new UnauthorizedException('Invalid refresh token')
+  //   }
+
+  //   const user = await this.userService.getUserById(tokenRow.dataValues.userId)
+  //   if (!user) {
+  //     throw new HttpException('User not found', HttpStatus.INTERNAL_SERVER_ERROR)
+  //   }
+
+  //   return await this.generateUserTokens(user)
+  // }
+
+  async refreshTokens(refreshTokenPlain?: string) {
+    if (!refreshTokenPlain) {
+      throw new UnauthorizedException('No refresh token')
+    }
+
+    const rows = await this.refreshTokenRepository.findAll({
       where: {
-        userId,
-        expiryDate: {
-          [Op.gte]: new Date()
-        }
-      }
+        expiryDate: { [Op.gte]: new Date() },
+      },
     })
 
-    if (!tokenRow) {
+    let matched: RefreshToken | undefined
+    for (const row of rows) {
+      if (await bcrypt.compare(refreshTokenPlain, row.dataValues.token)) {
+        matched = row;
+        break;
+      }
+    }
+
+    if (!matched) {
       throw new UnauthorizedException('Refresh token is invalid')
     }
 
-    const isTokensEqual = await bcrypt.compare(refreshToken, tokenRow.dataValues.token)
-    if (!isTokensEqual) {
-      throw new UnauthorizedException('Invalid refresh token')
-    }
-
-    const user = await this.userService.getUserById(tokenRow.dataValues.userId)
+    const user = await this.userService.getUserById(matched.dataValues.userId)
     if (!user) {
-      throw new HttpException('User not found', HttpStatus.INTERNAL_SERVER_ERROR)
+      throw new InternalServerErrorException('User not found')
     }
 
-    return await this.generateUserTokens(user)
+    await matched.destroy()
+
+    const tokens = await this.generateUserTokens(user)
+    return { ...tokens, user: this.safeUser(user) }
+  }
+
+  async revokeRefreshToken(refreshTokenPlain: string) {
+    const rows = await this.refreshTokenRepository.findAll({
+      where: {
+        expiryDate: { [Op.gte]: new Date() },
+      },
+    })
+
+    for (const row of rows) {
+      if (await bcrypt.compare(refreshTokenPlain, row.dataValues.token)) {
+        await row.destroy()
+        return;
+      }
+    }
   }
 
   async changePassword(userId: number, changePasswordDto: ChangePasswordDto) {
@@ -190,5 +239,11 @@ export class AuthService {
     if (passwordEquals) {
       return user
     }
+  }
+
+  private safeUser(user: User) {
+    const raw = (user as any).toJSON?.() ?? (user as any).dataValues ?? user
+    const { password, ...rest } = raw
+    return rest
   }
 }
