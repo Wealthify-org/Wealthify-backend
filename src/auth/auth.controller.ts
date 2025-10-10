@@ -1,4 +1,4 @@
-import { Body, Controller, HttpStatus, Post, Put, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, HttpStatus, Post, Put, Req, Res, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { CreateUserDto } from 'src/users/dto/create-user.dto';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
@@ -7,7 +7,9 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
+import { Response, Request } from 'express';
 import { LoginDto } from './dto/login.dto';
+import { clearAuthCookies, REFRESH_TOKEN_COOKIE, setAuthCookies } from './cookie.const';
 
 
 @ApiTags('Авторизация')
@@ -19,16 +21,20 @@ export class AuthController {
   @ApiResponse({status: HttpStatus.OK, description: 'Успешный вход', type: String})
   @ApiResponse({status: HttpStatus.UNAUTHORIZED, description: 'Неверный email или пароль'})
   @Post('/login')
-  login(@Body() userDto: LoginDto) {
-    return this.authService.login(userDto)
+  async login(@Body() userDto: LoginDto, @Res({ passthrough: true }) res: Response) {
+    const { accessToken, refreshToken, user } = await this.authService.login(userDto)
+    setAuthCookies(res, accessToken, refreshToken)
+    return { user }
   }
 
   @ApiOperation({summary: 'Регистрация нового аккаунта'})
   @ApiResponse({status: HttpStatus.CREATED, description: 'Регистрация прошла успешно', type: String})
   @ApiResponse({status: HttpStatus.BAD_REQUEST, description: 'Пользователь с таким email уже существует'})
   @Post('/registration')
-  registration(@Body() userDto: CreateUserDto) {
-    return this.authService.registration(userDto)
+  async registration(@Body() userDto: CreateUserDto, @Res({ passthrough: true }) res: Response) {
+    const { accessToken, refreshToken, user } = await this.authService.registration(userDto)
+    setAuthCookies(res, accessToken, refreshToken)
+    return { user }
   }
 
   @ApiOperation({summary: 'Обновление токенов'})
@@ -36,9 +42,25 @@ export class AuthController {
   @ApiResponse({status: HttpStatus.UNAUTHORIZED, description: 'Рефреш токены не совпадают'})
   @ApiResponse({status: HttpStatus.INTERNAL_SERVER_ERROR, description: 'Пользователя не удалось найти'})
   @Post('refresh')
-  refreshTokens(@Body() refreshTokenDto: RefreshTokenDto) {
-    return this.authService.refreshTokens(refreshTokenDto)
+  async refreshTokens(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const refreshToken = req.cookies?.[REFRESH_TOKEN_COOKIE];
+    const { accessToken, refreshToken: nextRefreshToken, user } = 
+      await this.authService.refreshTokens(refreshToken)
+      setAuthCookies(res, accessToken, nextRefreshToken)
+      return { user }
   }
+
+  @ApiOperation({ summary: 'Выход (инвалидация refresh + очистка cookie)' })
+  @Post('logout')
+  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const refreshToken = req.cookies?.[REFRESH_TOKEN_COOKIE]
+    if (refreshToken) {
+      await this.authService.revokeRefreshToken(refreshToken)
+    }
+    clearAuthCookies(res)
+    return { message: 'ok' }
+  }
+
 
   @ApiOperation({summary: 'Cмена пароля'})
   @ApiResponse({status: HttpStatus.OK, description: 'Смена пароля прошла успешно'})
@@ -46,7 +68,7 @@ export class AuthController {
   @ApiResponse({status: HttpStatus.UNAUTHORIZED, description: 'Пароль введен неверно'})
   @UseGuards(JwtAuthGuard)
   @Put('change-password')
-  changePassword(@Body() changePasswordDto: ChangePasswordDto, @Req() req) {
+  changePassword(@Body() changePasswordDto: ChangePasswordDto, @Req() req: any) {
     return this.authService.changePassword(
       req.userId,
       changePasswordDto
@@ -61,8 +83,8 @@ export class AuthController {
   }
 
   @ApiOperation({summary: 'Восстановление пароля'})
-  @ApiResponse({status: HttpStatus.UNAUTHORIZED, description: 'Действие токена истекло или он не найден'})
-  @ApiResponse({status: HttpStatus.INTERNAL_SERVER_ERROR, description: 'Пользователь, владеющий токеном не найден'})
+  @ApiResponse({status: HttpStatus.UNAUTHORIZED, description: 'Ссылка невалидна/истекла'})
+  @ApiResponse({status: HttpStatus.INTERNAL_SERVER_ERROR, description: 'Пользователь, не найден'})
   @Put('reset-password')
   resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
     return this.authService.resetPassword(resetPasswordDto)
