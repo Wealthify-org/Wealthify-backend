@@ -22,9 +22,9 @@ export class AuthController {
   @ApiResponse({status: HttpStatus.UNAUTHORIZED, description: 'Неверный email или пароль'})
   @Post('/login')
   async login(@Body() userDto: LoginDto, @Res({ passthrough: true }) res: Response) {
-    const { accessToken, refreshToken, user } = await this.authService.login(userDto)
-    setAuthCookies(res, accessToken, refreshToken)
-    return { user }
+    const { accessToken, refreshToken, user } = await this.authService.login(userDto);
+    setAuthCookies(res, refreshToken);
+    return { tokenType: "Bearer", accessToken, user };
   }
 
   @ApiOperation({summary: 'Регистрация нового аккаунта'})
@@ -33,8 +33,8 @@ export class AuthController {
   @Post('/registration')
   async registration(@Body() userDto: CreateUserDto, @Res({ passthrough: true }) res: Response) {
     const { accessToken, refreshToken, user } = await this.authService.registration(userDto)
-    setAuthCookies(res, accessToken, refreshToken)
-    return { user }
+    setAuthCookies(res, refreshToken)
+    return { tokenType: "Bearer", accessToken, user };
   }
 
   @ApiOperation({summary: 'Обновление токенов'})
@@ -46,8 +46,8 @@ export class AuthController {
     const refreshToken = req.cookies?.[REFRESH_TOKEN_COOKIE];
     const { accessToken, refreshToken: nextRefreshToken, user } = 
       await this.authService.refreshTokens(refreshToken)
-      setAuthCookies(res, accessToken, nextRefreshToken)
-      return { user }
+      setAuthCookies(res, nextRefreshToken)
+      return { tokenType: "Bearer", accessToken, user };
   }
 
   @ApiOperation({ summary: 'Выход (инвалидация refresh + очистка cookie)' })
