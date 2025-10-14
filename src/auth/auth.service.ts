@@ -49,35 +49,6 @@ export class AuthService {
     return { ...tokens, user: this.safeUser(user)}
   }
 
-  // async refreshTokens(refreshTokenDto: RefreshTokenDto) {
-  //   const { refreshToken, userId } = refreshTokenDto
-
-  //   const tokenRow = await this.refreshTokenRepository.findOne({
-  //     where: {
-  //       userId,
-  //       expiryDate: {
-  //         [Op.gte]: new Date()
-  //       }
-  //     }
-  //   })
-
-  //   if (!tokenRow) {
-  //     throw new UnauthorizedException('Refresh token is invalid')
-  //   }
-
-  //   const isTokensEqual = await bcrypt.compare(refreshToken, tokenRow.dataValues.token)
-  //   if (!isTokensEqual) {
-  //     throw new UnauthorizedException('Invalid refresh token')
-  //   }
-
-  //   const user = await this.userService.getUserById(tokenRow.dataValues.userId)
-  //   if (!user) {
-  //     throw new HttpException('User not found', HttpStatus.INTERNAL_SERVER_ERROR)
-  //   }
-
-  //   return await this.generateUserTokens(user)
-  // }
-
   async refreshTokens(refreshTokenPlain?: string) {
     if (!refreshTokenPlain) {
       throw new UnauthorizedException('No refresh token')
