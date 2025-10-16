@@ -1,22 +1,30 @@
-import { ApiProperty } from "@nestjs/swagger";
-import { Transform } from "class-transformer";
-import { IsEmail, IsString, Matches, MaxLength, MinLength } from "class-validator";
-import { ALLOWED_SYMBOLS, HAS_ALLOWED_SYMBOL, ONLY_ALLOWED_CHARS } from "../../common/validation/password.constants";
+import { z } from 'zod';
+import { createZodDto } from 'nestjs-zod';
+import {
+  ALLOWED_SYMBOLS,
+  HAS_ALLOWED_SYMBOL,
+  ONLY_ALLOWED_CHARS,
+} from '../../common/validation/password.constants';
 
-export class LoginDto {
-  @ApiProperty({ example: "user@mail.com", description: "Почта пользователя" })
-  @Transform(({ value }) => String(value).trim().toLowerCase())
-  @IsEmail({}, { message: "Invalid email address" })
-  readonly email: string;
+export const LoginSchema = z
+  .object({
+    email: z
+      .string()
+      .transform((v) => String(v).trim().toLowerCase())
+      .pipe(z.string().email('Invalid email address'))
+      .describe('Почта пользователя'),
 
-  @ApiProperty({ example: "P@s7w_rd-password", description: "Пароль пользователя" })
-  @IsString()
-  @MinLength(12)
-  @MaxLength(72)
-  @Matches(ONLY_ALLOWED_CHARS, { message: `Use letters, digits and only: ${ALLOWED_SYMBOLS}` })
-  @Matches(/[a-z]/, { message: "Must include a lowercase letter" })
-  @Matches(/[A-Z]/, { message: "Must include an uppercase letter" })
-  @Matches(/\d/,    { message: "Must include a number" })
-  @Matches(HAS_ALLOWED_SYMBOL, { message: `Must include at least one of: ${ALLOWED_SYMBOLS}` })
-  readonly password: string;
-}
+    password: z
+      .string()
+      .min(12, 'Password must be at least 12 characters long')
+      .max(72, 'Password must be at most 72 characters long')
+      .regex(ONLY_ALLOWED_CHARS, `Use letters, digits and only: ${ALLOWED_SYMBOLS}`)
+      .regex(/[a-z]/, 'Must include a lowercase letter')
+      .regex(/[A-Z]/, 'Must include an uppercase letter')
+      .regex(/\d/, 'Must include a number')
+      .regex(HAS_ALLOWED_SYMBOL, `Must include at least one of: ${ALLOWED_SYMBOLS}`)
+      .describe('Пароль пользователя'),
+  })
+  .strict(); // запрет лишних полей (как forbidNonWhitelisted)
+
+export class LoginDto extends createZodDto(LoginSchema) {}

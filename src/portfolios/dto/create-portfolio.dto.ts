@@ -1,17 +1,23 @@
-import { ApiProperty } from "@nestjs/swagger"
-import { PortfolioType } from "../portfolio-type.enum"
-import { IsEnum, IsInt, IsString } from "class-validator"
+import { z } from 'zod';
+import { createZodDto } from 'nestjs-zod';
+import { PortfolioType } from '../portfolio-type.enum';
 
-export class CreatePortfolioDto {
-  @ApiProperty({ example: 'My Investments', description: 'Название портфеля, задаётся пользователем' })
-  @IsString()
-  readonly name: string
+export const CreatePortfolioSchema = z
+  .object({
+    name: z
+      .string()
+      .min(1, 'name is required')
+      .describe('Название портфеля, задаётся пользователем'),
 
-  @ApiProperty({ example: 'Crypto', enum: PortfolioType, description: 'Тип портфеля: Crypto, Stock, Bond или Fiat' })
-  @IsEnum(PortfolioType)
-  readonly type: PortfolioType
+    type: z
+      .nativeEnum(PortfolioType)
+      .describe('Тип портфеля: Crypto, Stock, Bond или Fiat'),
 
-  @ApiProperty({ example: 42, description: 'ID пользователя, которому принадлежит портфель' })
-  @IsInt()
-  readonly userId: number
-}
+    userId: z
+      .coerce.number()
+      .int()
+      .describe('ID пользователя, которому принадлежит портфель'),
+  })
+  .strict();
+
+export class CreatePortfolioDto extends createZodDto(CreatePortfolioSchema) {}

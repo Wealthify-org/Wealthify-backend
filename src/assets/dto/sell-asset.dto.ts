@@ -1,24 +1,27 @@
-import { ApiProperty } from "@nestjs/swagger"
-import { IsBoolean, IsInt, IsNumber, IsString } from "class-validator"
+import { z } from 'zod';
+import { createZodDto } from 'nestjs-zod';
 
-export class SellAssetDto {
-  @ApiProperty({ example: 1, description: 'ID портфеля, в котором продаётся актив' })
-  @IsInt()
-  readonly portfolioId: number
+export const SellAssetSchema = z
+  .object({
+    portfolioId: z
+      .coerce.number()
+      .int()
+      .describe('ID портфеля, в котором продаётся актив'),
+    assetTicker: z
+      .string()
+      .min(1, 'assetTicker is required')
+      .describe('Тикер продаваемого актива'),
+    quantity: z
+      .coerce.number()
+      .describe('Количество продаваемого актива'),
+    convertToUsd: z
+      .coerce.boolean()
+      .optional()
+      .describe('Нужно ли конвертировать выручку от продажи в доллары (добавить USD в портфель)'),
+    pricePerUnit: z
+      .coerce.number()
+      .describe('Цена за одну единицу актива в момент продажи (в USD)'),
+  })
+  .strict();
 
-  @ApiProperty({ example: 'BTC', description: 'Тикер продаваемого актива' })
-  @IsString()
-  readonly assetTicker: string
-
-  @ApiProperty({ example: 2.5, description: 'Количество продаваемого актива' })
-  @IsNumber()
-  readonly quantity: number
-
-  @ApiProperty({ example: true, description: 'Нужно ли конвертировать выручку от продажи в доллары (добавить USD в портфель)' })
-  @IsBoolean()
-  readonly convertToUsd?: boolean
-
-  @ApiProperty({ example: 105000, description: 'Цена за одну единицу актива в момент продажи (в USD)' })
-  @IsNumber()
-  readonly pricePerUnit: number
-}
+export class SellAssetDto extends createZodDto(SellAssetSchema) {}

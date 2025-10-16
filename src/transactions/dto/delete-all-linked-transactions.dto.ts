@@ -1,11 +1,19 @@
-import { ApiProperty } from "@nestjs/swagger"
-import { IsInt } from "class-validator"
+import { z } from 'zod';
+import { createZodDto } from 'nestjs-zod';
 
-export class DeleteAllLinkedTransactionsDto {
-  @ApiProperty({ example: 1, description: 'ID портфеля, из которого будут удалены все связанные транзакции' })
-  @IsInt()
-  readonly portfolioId: number
-  @ApiProperty({ example: 5, description: 'ID актива, по которому будут удалены все связанные транзакции' })
-  @IsInt()
-  readonly assetId: number
-}
+export const DeleteAllLinkedTransactionsSchema = z
+  .object({
+    portfolioId: z
+      .coerce.number()
+      .int()
+      .describe('ID портфеля, из которого будут удалены все связанные транзакции'),
+    assetId: z
+      .coerce.number()
+      .int()
+      .describe('ID актива, по которому будут удалены все связанные транзакции'),
+  })
+  .strict();
+
+export class DeleteAllLinkedTransactionsDto extends createZodDto(
+  DeleteAllLinkedTransactionsSchema,
+) {}

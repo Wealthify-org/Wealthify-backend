@@ -1,29 +1,35 @@
-import { ApiProperty } from '@nestjs/swagger'
-import { TransactionType } from '../transaction-type.enum'
-import { IsDate, IsEnum, IsInt, IsNumber } from 'class-validator'
+import { z } from 'zod';
+import { createZodDto } from 'nestjs-zod';
+import { TransactionType } from '../transaction-type.enum';
 
-export class CreateTransactionDto {
-  @ApiProperty({ example: 12, description: 'ID портфеля, к которому относится транзакция' })
-  @IsInt()
-  readonly portfolioId: number
+export const CreateTransactionSchema = z
+  .object({
+    portfolioId: z
+      .coerce.number()
+      .int()
+      .describe('ID портфеля, к которому относится транзакция'),
 
-  @ApiProperty({ example: 5, description: 'ID актива, связанного с транзакцией' })
-  @IsInt()
-  readonly assetId: number
+    assetId: z
+      .coerce.number()
+      .int()
+      .describe('ID актива, связанного с транзакцией'),
 
-  @ApiProperty({ example: TransactionType.BUY, description: 'Тип транзакции: BUY (покупка) или SELL (продажа)', enum: TransactionType })
-  @IsEnum(TransactionType)
-  readonly type: TransactionType
+    type: z
+      .nativeEnum(TransactionType)
+      .describe('Тип транзакции: BUY (покупка) или SELL (продажа)'),
 
-  @ApiProperty({ example: 3.5, description: 'Количество актива, участвующее в транзакции' })
-  @IsNumber()
-  readonly quantity: number
+    quantity: z
+      .coerce.number()
+      .describe('Количество актива, участвующее в транзакции'),
 
-  @ApiProperty({ example: 26500.75, description: 'Цена за единицу актива на момент транзакции (в USD)' })
-  @IsNumber()
-  readonly pricePerUnit: number
+    pricePerUnit: z
+      .coerce.number()
+      .describe('Цена за единицу актива на момент транзакции (в USD)'),
 
-  @ApiProperty({ example: '2025-07-21T14:30:00Z', description: 'Дата и время выполнения транзакции' })
-  @IsDate()
-  readonly date: Date
-}
+    date: z
+      .coerce.date()
+      .describe('Дата и время выполнения транзакции'),
+  })
+  .strict();
+
+export class CreateTransactionDto extends createZodDto(CreateTransactionSchema) {}

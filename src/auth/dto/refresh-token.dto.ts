@@ -1,12 +1,19 @@
-import { ApiProperty } from "@nestjs/swagger";
-import { IsInt, IsString } from "class-validator";
+// refresh-token.dto.ts
+import { z } from 'zod';
+import { createZodDto } from 'nestjs-zod';
 
-export class RefreshTokenDto {
-  @ApiProperty({example: '-', description: 'Рефреш токен пользователя'})
-  @IsString()
-  readonly refreshToken: string
+export const RefreshTokenSchema = z
+  .object({
+    refreshToken: z
+      .string()
+      .min(1, 'refreshToken is required')
+      .describe('Рефреш токен пользователя'),
+    
+    userId: z
+      .coerce.number()
+      .int()
+      .describe('Айди пользователя, которому принадлежит токен'),
+  })
+  .strict();
 
-  @ApiProperty({example: '1', description: 'Айди пользователя, которому принадлежит токен'})
-  @IsInt()
-  readonly userId: number
-}
+export class RefreshTokenDto extends createZodDto(RefreshTokenSchema) {}

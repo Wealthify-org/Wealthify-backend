@@ -1,21 +1,25 @@
-import { ApiProperty } from "@nestjs/swagger"
-import { IsInt, IsNumber, IsString } from "class-validator"
+import { z } from 'zod';
+import { createZodDto } from 'nestjs-zod';
 
+export const AddAssetToPortfolioSchema = z
+  .object({
+    portfolioId: z
+      .coerce.number()
+      .int()
+      .describe('Айди портфеля, в который добавляется актив'),
+    assetTicker: z
+      .string()
+      .min(1, 'assetTicker is required')
+      .describe('Тикер актива, который добавляется в портфель'),
+    quantity: z
+      .coerce.number()
+      .describe('Количество единиц актива, который добавляется в портфель'),
+    purchasePrice: z
+      .coerce.number()
+      .describe('Цена, по которой актив добавляется в портфель (в USD)'),
+  })
+  .strict();
 
-export class AddAssetToPortfolioDto {
-  @ApiProperty({example: '1', description: 'Айди портфеля, в который добавляется актив'})
-  @IsInt()
-  readonly portfolioId: number
-
-  @ApiProperty({example: '1', description: 'Айди актива, который добавляется в портфель'})
-  @IsString()
-  readonly assetTicker: string
-
-  @ApiProperty({example: '2.5', description: 'Количество единиц актива, который добавляется в портфель'})
-  @IsNumber()
-  readonly quantity: number
-  
-  @ApiProperty({example: '300', description: 'Цена, по которой актив добавляется в портфель (в USD)'})
-  @IsNumber()
-  readonly purchasePrice: number
-}
+export class AddAssetToPortfolioDto extends createZodDto(
+  AddAssetToPortfolioSchema,
+) {}
