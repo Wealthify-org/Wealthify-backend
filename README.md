@@ -6,7 +6,7 @@ REST API на **NestJS** c **PostgreSQL** и **Sequelize** для управле
 
 * **NestJS** (HTTP, Guards, Validation)
 * **Sequelize** / `sequelize-typescript` (PostgreSQL: `pg`, `pg-hstore`)
-* **class-validator** / **class-transformer**
+* **Zod**
 * **@nestjs/jwt**
 * **Swagger** (`@nestjs/swagger`, `swagger-ui-express`)
 * Тесты: **Jest** / **ts-jest** / **supertest**
