@@ -1,14 +1,17 @@
-import { ApiProperty } from "@nestjs/swagger"
-import { IsString, Matches, MinLength } from "class-validator"
+// change-password.dto.ts
+import { z } from 'zod';
+import { createZodDto } from 'nestjs-zod';
 
-export class ChangePasswordDto {
-  @ApiProperty({example: 'password123', description: 'Пароль пользователя, который меняют'})
-  @IsString()
-  readonly oldPassword: string
+export const ChangePasswordSchema = z
+  .object({
+    oldPassword: z.string().min(1, 'oldPassword is required').describe('Пароль пользователя, который меняют'),
 
-  @ApiProperty({example: 'newPassword123', description: 'Пароль, на который меняют'})
-  @IsString()
-  @MinLength(6)
-  @Matches(/^(?=.*[0-9])/, { message: 'Password must contain at least one number' })
-  readonly newPassword: string
-}
+    newPassword: z
+      .string()
+      .min(6, 'Password must be at least 6 characters long')
+      .regex(/\d/, 'Password must contain at least one number')
+      .describe('Пароль, на который меняют'),
+  })
+  .strict();
+
+export class ChangePasswordDto extends createZodDto(ChangePasswordSchema) {}

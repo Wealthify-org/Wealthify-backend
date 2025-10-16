@@ -1,16 +1,22 @@
-import { ApiProperty } from "@nestjs/swagger"
-import { IsBoolean, IsInt, IsString } from "class-validator"
+import { z } from 'zod';
+import { createZodDto } from 'nestjs-zod';
 
-export class RemoveAssetFromPortfolioDto {
-  @ApiProperty({ example: 1, description: 'ID портфеля, из которого удаляется актив' })
-  @IsInt()
-  readonly portfolioId: number
+export const RemoveAssetFromPortfolioSchema = z
+  .object({
+    portfolioId: z
+      .coerce.number()
+      .int()
+      .describe('ID портфеля, из которого удаляется актив'),
+    assetTicker: z
+      .string()
+      .min(1, 'assetTicker is required')
+      .describe('Тикер удаляемого актива'),
+    removeAllLinkedTransactions: z
+      .coerce.boolean()
+      .describe('Удалять ли все связанные транзакции с этим активом'),
+  })
+  .strict();
 
-  @ApiProperty({ example: 'BTC', description: 'Тикер удаляемого актива' })
-  @IsString()
-  readonly assetTicker: string
-
-  @ApiProperty({ example: true, description: 'Удалять ли все связанные транзакции с этим активом' })
-  @IsBoolean()
-  readonly removeAllLinkedTransactions: boolean
-}
+export class RemoveAssetFromPortfolioDto extends createZodDto(
+  RemoveAssetFromPortfolioSchema,
+) {}

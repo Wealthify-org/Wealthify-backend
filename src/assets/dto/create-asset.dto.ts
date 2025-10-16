@@ -1,17 +1,17 @@
-import { ApiProperty } from "@nestjs/swagger"
-import { AssetType } from "../asset-type.enum"
-import { IsEnum, IsString } from "class-validator"
+import { z } from 'zod';
+import { createZodDto } from 'nestjs-zod';
+import { AssetType } from '../asset-type.enum';
 
-export class CreateAssetDto {
-  @ApiProperty({ example: 'Bitcoin', description: 'Название актива' })
-  @IsString()
-  readonly name: string
+export const CreateAssetSchema = z
+  .object({
+    name: z.string().min(1, 'name is required').describe('Название актива'),
+    ticker: z.string().min(1, 'ticker is required').describe('Тикер актива'),
+    type: z
+      .nativeEnum(AssetType)
+      .describe(
+        'Тип актива: Crypto (криптовалюты), Stock (акции), Bond (облигации), Fiat (фиатные деньги)',
+      ),
+  })
+  .strict();
 
-  @ApiProperty({ example: 'BTC', description: 'Тикер актива' })
-  @IsString()
-  readonly ticker: string
-
-  @ApiProperty({ example: 'Crypto', enum: AssetType, description: 'Тип актива, может быть Crypto - для криптовалют, Stock - для акций, Bond - для облигаций или Fiat - для фиатных денег' })
-  @IsEnum(AssetType)
-  readonly type: AssetType
-}
+export class CreateAssetDto extends createZodDto(CreateAssetSchema) {}

@@ -1,11 +1,11 @@
-import { ApiProperty } from "@nestjs/swagger"
-import { IsString } from "class-validator"
+import { z } from 'zod';
+import { createZodDto } from 'nestjs-zod';
 
-export class CreateRoleDto {
-  @ApiProperty({example: 'ADMIN', description: 'Название роли пользователя'})
-  @IsString()
-  readonly value: string
-  @ApiProperty({example: 'Администратор', description: 'Описание роли пользователя'})
-  @IsString()
-  readonly description: string
-}
+export const CreateRoleSchema = z
+  .object({
+    value: z.string().min(1, 'value is required').describe('Название роли пользователя'),
+    description: z.string().min(1, 'description is required').describe('Описание роли пользователя'),
+  })
+  .strict();
+
+export class CreateRoleDto extends createZodDto(CreateRoleSchema) {}

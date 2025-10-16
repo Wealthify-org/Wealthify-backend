@@ -1,11 +1,17 @@
-import { ApiProperty } from "@nestjs/swagger"
-import { IsInt, IsString } from "class-validator"
+import { z } from 'zod';
+import { createZodDto } from 'nestjs-zod';
 
-export class AddRoleDto {
-  @ApiProperty({example: 5, description: 'ID пользователя, которому мы добавляем роль'})
-  @IsInt()
-  readonly userId: number
-  @ApiProperty({example: 'ADMIN', description: 'Роль, которую мы выдаем'})
-  @IsString()
-  readonly value: string
-}
+export const AddRoleSchema = z
+  .object({
+    userId: z
+      .coerce.number()
+      .int()
+      .describe('ID пользователя, которому мы добавляем роль'),
+    value: z
+      .string()
+      .min(1, 'value is required')
+      .describe('Роль, которую мы выдаем'),
+  })
+  .strict();
+
+export class AddRoleDto extends createZodDto(AddRoleSchema) {}

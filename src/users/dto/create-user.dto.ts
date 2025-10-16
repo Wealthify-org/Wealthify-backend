@@ -1,45 +1,44 @@
-import { ApiProperty } from "@nestjs/swagger";
-import { Transform } from "class-transformer";
+import { z } from 'zod';
+import { createZodDto } from 'nestjs-zod';
 import {
-  IsEmail, IsString, Length, Matches, MaxLength, MinLength
-} from "class-validator";
-import { ALLOWED_SYMBOLS, HAS_ALLOWED_SYMBOL, ONLY_ALLOWED_CHARS } from "../../common/validation/password.constants";
+  ALLOWED_SYMBOLS,
+  HAS_ALLOWED_SYMBOL,
+  ONLY_ALLOWED_CHARS,
+} from '../../common/validation/password.constants';
 
-export class CreateUserDto {
-  @ApiProperty({ example: "outea7t", description: "Никнейм пользователя" })
-  @IsString()
-  @Length(3, 30, { message: "Username must be 3-30 characters" })
-  // только латиница, цифры и _ . - , начинается с буквы
-  @Matches(/^[A-Za-z][A-Za-z0-9_.-]*$/, {
-    message: "Use letters, digits, '_', '.', '-' (must start with a letter)",
-  })
-  // не заканчивается спецсимволом
-  @Matches(/[A-Za-z0-9]$/, { message: "Cannot end with '_', '.' or '-'" })
-  // без двух спецсимволов подряд
-  @Matches(/^(?!.*[_.-]{2,}).*$/, { message: "No consecutive special characters" })
-  // не только цифры
-  @Matches(/(?!^\d+$)^.+$/, { message: "Username cannot be only digits" })
-  readonly username: string;
+export const CreateUserSchema = z
+  .object({
+    username: z
+      .string()
+      .min(3, 'Username must be 3-30 characters')
+      .max(30, 'Username must be 3-30 characters')
+      // только латиница, цифры и _ . - , начинается с буквы
+      .regex(/^[A-Za-z][A-Za-z0-9_.-]*$/, "Use letters, digits, '_', '.', '-' (must start with a letter)")
+      // не заканчивается спецсимволом
+      .regex(/[A-Za-z0-9]$/, "Cannot end with '_', '.' or '-'")
+      // без двух спецсимволов подряд
+      .regex(/^(?!.*[_.-]{2,}).*$/, 'No consecutive special characters')
+      // не только цифры
+      .regex(/(?!^\d+$)^.+$/, 'Username cannot be only digits')
+      .describe('Никнейм пользователя'),
 
-  @ApiProperty({ example: "user@mail.ru", description: "Почта пользователя" })
-  @Transform(({ value }) => String(value).trim().toLowerCase())
-  @IsEmail({}, { message: "Invalid email address" })
-  readonly email: string;
+    email: z
+      .string()
+      .transform((v) => String(v).trim().toLowerCase())
+      .pipe(z.string().email('Invalid email address'))
+      .describe('Почта пользователя'),
 
-  @ApiProperty({ example: "Aa12!aaaa....", description: "Пароль пользователя" })
-  @IsString()
-  @MinLength(12, { message: "Password must be at least 12 characters" })
-  @MaxLength(72, { message: "Password must be at most 72 characters" })
-  // только разрешённые символы
-  @Matches(ONLY_ALLOWED_CHARS, {
-    message: `Use letters, digits and only these symbols: ${ALLOWED_SYMBOLS}`,
+    password: z
+      .string()
+      .min(12, 'Password must be at least 12 characters')
+      .max(72, 'Password must be at most 72 characters')
+      .regex(ONLY_ALLOWED_CHARS, `Use letters, digits and only these symbols: ${ALLOWED_SYMBOLS}`)
+      .regex(/[a-z]/, 'Must include a lowercase letter')
+      .regex(/[A-Z]/, 'Must include an uppercase letter')
+      .regex(/\d/, 'Must include a number')
+      .regex(HAS_ALLOWED_SYMBOL, `Must include at least one of: ${ALLOWED_SYMBOLS}`)
+      .describe('Пароль пользователя'),
   })
-  // классы символов
-  @Matches(/[a-z]/, { message: "Must include a lowercase letter" })
-  @Matches(/[A-Z]/, { message: "Must include an uppercase letter" })
-  @Matches(/\d/,    { message: "Must include a number" })
-  @Matches(HAS_ALLOWED_SYMBOL, {
-    message: `Must include at least one of: ${ALLOWED_SYMBOLS}`,
-  })
-  readonly password: string;
-}
+  .strict();
+
+export class CreateUserDto extends createZodDto(CreateUserSchema) {}
