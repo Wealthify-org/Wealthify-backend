@@ -16,6 +16,17 @@
     "forceConsistentCasingInFileNames": true,
     "noImplicitAny": false,
     "strictBindCallApply": false,
-    "noFallthroughCasesInSwitch": false
+    "noFallthroughCasesInSwitch": false,
+    "paths": {
+      "@app/contracts": [
+        "libs/contracts/src"
+      ],
+      "@app/*": ["apps/app/src/*"],
+      "@gateway/*": ["apps/api-gateway/src/*"],
+      "@crypto-worker/*": ["apps/crypto-data-worker/src/*"],
+      "@app/contracts/*": [
+        "libs/contracts/src/*"
+      ]
+    }
   }
 }

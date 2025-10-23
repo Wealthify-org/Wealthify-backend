@@ -1,0 +1,1 @@
+export const APP_CLIENT = "APP_CLIENT";
