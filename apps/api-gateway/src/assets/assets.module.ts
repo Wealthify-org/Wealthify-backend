@@ -8,9 +8,10 @@ import { AssetsController } from "./assets.controller";
 import { AssetsService } from "./assets.service";
 
 import { APP_CLIENT } from './constant';
+import { GatewayAuthModule } from '@gateway/auth/gateway-auth.module';
 
 @Module({
-  imports: [ClientConfigModule],
+  imports: [GatewayAuthModule, ClientConfigModule],
   controllers: [AssetsController],
   providers: [
     AssetsService,

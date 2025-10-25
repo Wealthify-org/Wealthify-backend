@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Injectable, InternalServerErrorException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { HttpStatus, Injectable} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { CreateUserDto } from  '@app/contracts';
 import { UsersService } from '@app/users/users.service';
@@ -7,7 +7,6 @@ import { InjectModel } from '@nestjs/sequelize';
 import { RefreshToken } from './refresh-token.model';
 import { ResetToken } from './reset-token-model';
 import { v4 as uuidv4 } from 'uuid'
-import { RefreshTokenDto } from  '@app/contracts';
 import { Op } from 'sequelize';
 import { ChangePasswordDto } from  '@app/contracts';
 import { ForgotPasswordDto } from  '@app/contracts';
@@ -16,10 +15,11 @@ import { ResetPasswordDto } from  '@app/contracts';
 import { LoginDto } from  '@app/contracts';
 import { UserPayload } from  '@app/contracts/common/types/user-payload.type';
 import { User } from '@app/users/users.model';
+import { rpcError } from '@app/contracts/common/rpc/rpc-error';
 
 @Injectable()
 export class AuthService {
-  private hashComplexity: number = 10
+  private readonly hashComplexity: number = 10
 
   constructor (
     private userService: UsersService, 
@@ -30,9 +30,16 @@ export class AuthService {
   ) {}
 
   async registration(userDto: CreateUserDto) {
-    const candidate = await this.userService.getUserByEmail(userDto.email)
-    if (candidate) {
-      throw new HttpException('User with such email already exists', HttpStatus.BAD_REQUEST)
+    const [candidateByEmail, candidateByUsername] = await Promise.all([
+      this.userService.getUserByEmail(userDto.email),
+      this.userService.getUserByUsername(userDto.username)
+    ]);
+
+    if (candidateByEmail) {
+      rpcError(HttpStatus.BAD_REQUEST, 'USER_EXISTS', 'User with such email already exists');
+    }
+    if (candidateByUsername) {
+      rpcError(HttpStatus.BAD_REQUEST, 'USER_EXISTS', 'User with such username already exists');
     }
     const hashPassword = await bcrypt.hash(userDto.password, this.hashComplexity)
     const user = await this.userService.createUser({...userDto, password: hashPassword})
@@ -43,7 +50,7 @@ export class AuthService {
   async login(userDto: LoginDto) {
     const user = await this.validateUser(userDto)
     if (!user) {
-      throw new UnauthorizedException({message: 'Incorrect email or password'})
+      rpcError(HttpStatus.UNAUTHORIZED, "BAD_CREDENTIALS", 'Incorrect email or password');
     }
     const tokens = await this.generateUserTokens(user)
     return { ...tokens, user: this.safeUser(user)}
@@ -51,7 +58,7 @@ export class AuthService {
 
   async refreshTokens(refreshTokenPlain?: string) {
     if (!refreshTokenPlain) {
-      throw new UnauthorizedException('No refresh token')
+      rpcError(HttpStatus.UNAUTHORIZED, 'NO_REFRESH', 'No refresh token');
     }
 
     const rows = await this.refreshTokenRepository.findAll({
@@ -69,12 +76,12 @@ export class AuthService {
     }
 
     if (!matched) {
-      throw new UnauthorizedException('Refresh token is invalid')
+      rpcError(HttpStatus.UNAUTHORIZED, 'INVALID_REFRESH', 'Refresh token is invalid');
     }
 
     const user = await this.userService.getUserById(matched.dataValues.userId)
     if (!user) {
-      throw new InternalServerErrorException('User not found')
+      rpcError(HttpStatus.INTERNAL_SERVER_ERROR, 'USER_NOT_FOUND', 'User not found');
     }
 
     await matched.destroy()
@@ -102,12 +109,12 @@ export class AuthService {
     const { oldPassword, newPassword } = changePasswordDto
     const user = await this.userService.getUserById(userId)
     if (!user) {
-      throw new NotFoundException('User not found')
+      rpcError(HttpStatus.NOT_FOUND, 'USER_NOT_FOUND', 'User not found');
     }
 
     const passwordMatch = await bcrypt.compare(oldPassword, user.dataValues.password)
     if (!passwordMatch) {
-      throw new UnauthorizedException('Wrong credentials')
+      rpcError(HttpStatus.UNAUTHORIZED, 'BAD_CREDENTIALS', 'Wrong credentials');
     }
 
     const newHashedPassword = await bcrypt.hash(newPassword, this.hashComplexity)
@@ -150,17 +157,17 @@ export class AuthService {
     })
 
     if (!tokenRow) {
-      throw new UnauthorizedException('Invalid link')
+      rpcError(HttpStatus.UNAUTHORIZED, 'INVALID_LINK', 'Invalid link');
     }
 
     const isTokensEqual = await bcrypt.compare(resetToken, tokenRow.dataValues.token)
     if (!isTokensEqual) {
-      throw new UnauthorizedException('Invalid link');
+      rpcError(HttpStatus.UNAUTHORIZED, 'INVALID_LINK', 'Invalid link');
     }
 
     const user = await this.userService.getUserById(tokenRow.dataValues.userId)
     if (!user) {
-      throw new InternalServerErrorException()
+      rpcError(HttpStatus.INTERNAL_SERVER_ERROR, 'USER_NOT_FOUND', 'User not found');
     }
 
     user.password = await bcrypt.hash(newPassword, this.hashComplexity) 

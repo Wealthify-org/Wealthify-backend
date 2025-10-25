@@ -7,9 +7,10 @@ import { ClientConfigService } from '../client-config/client-config.service';
 import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
 import { APP_CLIENT } from "./constant";
+import { GatewayAuthModule } from '@gateway/auth/gateway-auth.module';
 
 @Module({
-  imports: [ClientConfigModule],
+  imports: [GatewayAuthModule, ClientConfigModule],
   controllers: [UsersController],
   providers: [
     UsersService,

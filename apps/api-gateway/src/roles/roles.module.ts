@@ -7,9 +7,10 @@ import { ClientConfigService } from "../client-config/client-config.service";
 import { RolesController } from "./roles.controller";
 import { RolesService } from "./roles.service";
 import { APP_CLIENT } from "./constant";
+import { GatewayAuthModule } from "@gateway/auth/gateway-auth.module";
 
 @Module({
-  imports: [ClientConfigModule],
+  imports: [GatewayAuthModule, ClientConfigModule],
   controllers: [RolesController],
   providers: [
     RolesService,

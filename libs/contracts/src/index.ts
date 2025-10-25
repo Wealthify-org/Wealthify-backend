@@ -19,3 +19,12 @@ export * from "./transactions/dto/delete-all-linked-transactions.dto";
 
 export * from "./users/dto/add-role.dto";
 export * from "./users/dto/create-user.dto";
+
+export * from "./common/enums/asset-type.enum";
+export * from "./common/enums/portfolio-type.enum";
+export * from "./common/enums/transaction-type.enum";
+
+export * from "./common/rpc/rpc-error.type";
+export * from "./common/types/user-payload.type";
+
+export * from "./common/validation/password.constants";

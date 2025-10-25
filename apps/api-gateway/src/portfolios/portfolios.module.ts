@@ -7,9 +7,10 @@ import { ClientConfigService } from "../client-config/client-config.service";
 import { PortfoliosController } from "./portfolios.controller";
 import { PortfoliosService } from "./portfolios.service";
 import { APP_CLIENT } from "./constant";
+import { GatewayAuthModule } from "@gateway/auth/gateway-auth.module";
 
 @Module({
-  imports: [ClientConfigModule],
+  imports: [GatewayAuthModule, ClientConfigModule],
   controllers: [PortfoliosController],
   providers: [
     PortfoliosService,

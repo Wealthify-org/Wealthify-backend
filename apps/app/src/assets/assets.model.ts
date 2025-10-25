@@ -1,7 +1,7 @@
 import { Table, Model, Column, DataType, BelongsToMany } from "sequelize-typescript"
 import { Portfolio } from "@app/portfolios/portfolios.model"
 import { PortfolioAssets } from "./portfolio-assets.model"
-import { AssetType } from "../../../../libs/contracts/src/common/enums/asset-type.enum"
+import { AssetType } from "@app/contracts"
 import { ApiProperty } from "@nestjs/swagger"
 
 interface AssetCreationAttrs {

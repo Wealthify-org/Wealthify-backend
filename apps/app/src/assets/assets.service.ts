@@ -11,6 +11,7 @@ import { RemoveAssetFromPortfolioDto } from  '@app/contracts';
 import { TransactionsService } from '@app/transactions/transactions.service';
 import { AssetType } from  '@app/contracts';
 import { TransactionType } from  '@app/contracts/common/enums/transaction-type.enum';
+import { rpcError } from '@app/contracts/common';
 
 @Injectable()
 export class AssetsService {
@@ -21,18 +22,47 @@ export class AssetsService {
     private transactionsService: TransactionsService
     ) {}
   
+ async createAsset(dto: CreateAssetDto) {
+    const { ticker } = dto
+    const foundAsset = await this.assetRepository.findOne({where: {ticker}})
+    if (foundAsset) {
+      rpcError(HttpStatus.CONFLICT, 'ASSET_EXISTS', `Asset ${ticker} already exists`);
+    }
+    
+    const asset = await this.assetRepository.create(dto)
+    return asset
+  }
+
+  async getAssetByTicker(ticker: string) {
+    const asset = await this.assetRepository.findOne({where: {ticker}})
+
+    if (!asset) {
+      rpcError(HttpStatus.NOT_FOUND, 'ASSET_NOT_FOUND', `There's no such asset as ${ticker}`);
+    }
+
+    return asset
+  }
+
   async addAssetToPortfolio(dto: AddAssetToPortfolioDto) {
     const { portfolioId, assetTicker, quantity, purchasePrice } = dto
 
     const asset = await this.assetRepository.findOne({where: {ticker: assetTicker}})
     if (!asset) {
-      throw new HttpException(`Asset ${assetTicker} not found`, HttpStatus.NOT_FOUND)
+      rpcError(HttpStatus.NOT_FOUND, 'ASSET_NOT_FOUND', `Asset ${assetTicker} not found`);
     }
 
     const portfolio = await this.portfolioRepository.findByPk(portfolioId)
     
     if (!portfolio) {
-      throw new HttpException(`Portfolio ${portfolioId} not found`, HttpStatus.NOT_FOUND)
+      rpcError(HttpStatus.NOT_FOUND, 'PORTFOLIO_NOT_FOUND', `Portfolio ${portfolioId} not found`);
+    }
+
+    if (quantity <= 0) {
+      rpcError(HttpStatus.BAD_REQUEST, 'INVALID_QUANTITY', 'Asset quantity should be greater than 0');
+    }
+
+    if (purchasePrice <= 0) {
+      rpcError(HttpStatus.BAD_REQUEST, 'INVALID_PRICE', 'Asset price should be greater than 0');
     }
 
     let portfolioAsset = await this.portfolioAssetRepository.findOne({where: {portfolioId, assetId: asset.id}})
@@ -72,52 +102,35 @@ export class AssetsService {
 
     return portfolioAsset
   }
-  
-  async createAsset(dto: CreateAssetDto) {
-    const { ticker } = dto
-    const foundAsset = await this.assetRepository.findOne({where: {ticker}})
-    if (foundAsset) {
-      throw new HttpException(`Asset ${ticker} already exists`, HttpStatus.BAD_REQUEST)
-    }
-    
-    const asset = await this.assetRepository.create(dto)
-    return asset
-  }
-
-  async getAssetByTicker(ticker: string) {
-    const asset = await this.assetRepository.findOne({where: {ticker}})
-
-    if (!asset) {
-      throw new HttpException(`There\'s no such asset as ${ticker}`, HttpStatus.NOT_FOUND)
-    }
-
-    return asset
-  }
 
   async sellAsset(dto: SellAssetDto) {
     const { portfolioId, assetTicker, quantity, convertToUsd, pricePerUnit } = dto
 
     const asset = await this.assetRepository.findOne({where: {ticker: assetTicker}})
     if (!asset) {
-      throw new HttpException(`Asset ${assetTicker} not found`, HttpStatus.NOT_FOUND)
+      rpcError(HttpStatus.NOT_FOUND, 'ASSET_NOT_FOUND', `Asset ${assetTicker} not found`);
     }
 
     const portfolio = await this.portfolioRepository.findByPk(portfolioId)
     if (!portfolio) {
-      throw new HttpException(`Portfolio ${portfolioId} not found`, HttpStatus.NOT_FOUND)
+      rpcError(HttpStatus.NOT_FOUND, 'PORTFOLIO_NOT_FOUND', `Portfolio ${portfolioId} not found`);
     }
 
     let portfolioAsset = await this.portfolioAssetRepository.findOne({where: {portfolioId, assetId: asset.id}})
     if (!portfolioAsset) {
-      throw new HttpException(`No such asset ${assetTicker} in portfolio ${portfolioId}`, HttpStatus.NOT_FOUND)
+      rpcError(
+        HttpStatus.NOT_FOUND,
+        'ASSET_NOT_IN_PORTFOLIO',
+        `No such asset ${assetTicker} in portfolio ${portfolioId}`,
+      );
     }
 
     if (quantity <= 0) {
-      throw new HttpException('Asset quantity should be greater than 0', HttpStatus.BAD_REQUEST)
+      rpcError(HttpStatus.BAD_REQUEST, 'INVALID_QUANTITY', 'Asset quantity should be greater than 0');
     }
 
-    if (portfolioAsset.dataValues.quantity < quantity) {
-      throw new HttpException('Not enough asset to sell', HttpStatus.BAD_REQUEST)
+    if (portfolioAsset.quantity < quantity) {
+      rpcError(HttpStatus.BAD_REQUEST, 'NOT_ENOUGH_ASSET', 'Not enough asset to sell');
     }
 
     if (portfolioAsset.dataValues.quantity === quantity) {
@@ -128,8 +141,8 @@ export class AssetsService {
     }
 
     if (convertToUsd) {
-      if (pricePerUnit <= 0) {
-        throw new HttpException('Asset price should be greater than zero', HttpStatus.BAD_REQUEST)
+      if (!pricePerUnit || pricePerUnit <= 0) {
+        rpcError(HttpStatus.BAD_REQUEST, 'INVALID_PRICE', 'Asset price should be greater than zero');
       }
 
       const usdAmount = quantity * pricePerUnit
@@ -162,7 +175,7 @@ export class AssetsService {
     const asset = await this.assetRepository.findOne({ where: { ticker }})
 
     if (!asset) {
-      throw new HttpException(`Asset ${ticker} not found`, HttpStatus.NOT_FOUND)
+      rpcError(HttpStatus.NOT_FOUND, 'ASSET_NOT_FOUND', `Asset ${ticker} not found`);
     }
     
     const portfolios = await this.portfolioRepository.findAll()
@@ -187,12 +200,16 @@ export class AssetsService {
 
     const asset = await this.assetRepository.findOne({where: {ticker: assetTicker}})
     if (!asset) {
-      throw new HttpException(`Asset ${assetTicker} not found`, HttpStatus.NOT_FOUND)
+      rpcError(HttpStatus.NOT_FOUND, 'ASSET_NOT_FOUND', `Asset ${assetTicker} not found`);
     }
 
     const portfolioAsset = await this.portfolioAssetRepository.findOne({where: {portfolioId, assetId: asset.dataValues.id}})
     if (!portfolioAsset) {
-      throw new HttpException(`Asset ${assetTicker} not found in portfolio ${portfolioId}`, HttpStatus.NOT_FOUND)
+      rpcError(
+        HttpStatus.NOT_FOUND,
+        'ASSET_NOT_IN_PORTFOLIO',
+        `Asset ${assetTicker} not found in portfolio ${portfolioId}`,
+      );
     }
 
     if (removeAllLinkedTransactions) {

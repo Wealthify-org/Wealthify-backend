@@ -6,8 +6,6 @@ import { Portfolio } from "@app/portfolios/portfolios.model"
 import { Asset } from './assets.model';
 import { PortfolioAssets } from './portfolio-assets.model';
 import { TransactionsModule } from '@app/transactions/transactions.module';
-import { AuthModule } from '@app/auth/auth.module';
-import { RolesModule } from '@app/roles/roles.module';
 
 @Module({
   controllers: [AssetsController],

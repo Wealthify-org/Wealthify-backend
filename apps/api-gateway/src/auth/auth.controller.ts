@@ -27,7 +27,8 @@ export class AuthController {
   async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
     const { accessToken, refreshToken, user } = await this.auth.login(dto);
     setAuthCookies(res, refreshToken);
-    return { tokenType: 'Bearer', accessToken, user };
+    res.setHeader('Authorization', `Bearer ${accessToken}`)
+    return { user };
   }
 
   @ApiOperation({ summary: 'Регистрация нового аккаунта' })
@@ -37,7 +38,8 @@ export class AuthController {
   async registration(@Body() dto: CreateUserDto, @Res({ passthrough: true }) res: Response) {
     const { accessToken, refreshToken, user } = await this.auth.registration(dto);
     setAuthCookies(res, refreshToken);
-    return { tokenType: 'Bearer', accessToken, user };
+    res.setHeader('Authorization', `Bearer ${accessToken}`)
+    return { user };
   }
 
   @ApiOperation({ summary: 'Обновление токенов' })
@@ -48,7 +50,9 @@ export class AuthController {
     const refreshToken = req.cookies?.[REFRESH_TOKEN_COOKIE];
     const { accessToken, refreshToken: nextRefreshToken, user } = await this.auth.refreshTokens(refreshToken);
     setAuthCookies(res, nextRefreshToken);
-    return { tokenType: 'Bearer', accessToken, user };
+    res.setHeader('Authorization', `Bearer ${accessToken}`)
+
+    return { user };
   }
 
   @ApiOperation({ summary: 'Выход (инвалидация refresh + очистка cookie)' })

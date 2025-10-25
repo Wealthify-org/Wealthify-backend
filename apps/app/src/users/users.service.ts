@@ -1,8 +1,9 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { User } from './users.model';
 import { InjectModel } from '@nestjs/sequelize';
 import { CreateUserDto, AddRoleDto } from "@app/contracts";
 import { RolesService } from '@app/roles/roles.service';
+import { rpcError } from '@app/contracts/common';
 
 @Injectable()
 export class UsersService {
@@ -19,14 +20,14 @@ export class UsersService {
     })
 
     if (existingUser) {
-      throw new HttpException('User with such email already exists', HttpStatus.BAD_REQUEST)
+      rpcError(HttpStatus.CONFLICT, 'EMAIL_TAKEN', 'User with such email already exists');
     }
 
     const user = await this.userRepository.create(dto)
     const role = await this.roleService.getRoleByValue('USER')
     
     if (!role) {
-      throw new HttpException('Role \'USER\' not found', HttpStatus.NOT_FOUND);
+      rpcError(HttpStatus.NOT_FOUND, 'ROLE_NOT_FOUND', "Role \'USER\' not found");
     }
 
     await user.$set('roles', [role.id])
@@ -42,8 +43,13 @@ export class UsersService {
   }
 
   async getUserByEmail(email: string) {
-    const user = this.userRepository.findOne({where: {email}, include: {all: true, nested: true}})
+    const user = await this.userRepository.findOne({where: {email}, include: {all: true, nested: true}})
     return user
+  }
+
+  async getUserByUsername(username: string) {
+    const user = this.userRepository.findOne({where: {username}, include: {all: true, nested: true}});
+    return user;
   }
 
   async getUserById(userId: number) {
@@ -58,19 +64,19 @@ export class UsersService {
     )
 
     if (!user) {
-      throw new HttpException(`User with id: ${userId} doesn't exist`, HttpStatus.NOT_FOUND)
+      rpcError(HttpStatus.NOT_FOUND, 'USER_NOT_FOUND', `User with id ${userId} doesn't exist`);
     }
 
     const role = await this.roleService.getRoleByValue(value)
     if (!role) {
-      throw new HttpException('Role \'USER\' not found', HttpStatus.NOT_FOUND);
+      rpcError(HttpStatus.NOT_FOUND, 'ROLE_NOT_FOUND', `Role '${value}' not found`);
     }
 
     console.log(user.dataValues)
 
     const hasRole = user.dataValues.roles.some(role => role.value === value)
     if (hasRole) {
-      throw new HttpException(`User has already got role ${value}`, HttpStatus.BAD_REQUEST)
+      rpcError(HttpStatus.CONFLICT, 'ROLE_ALREADY_ASSIGNED', `User already has role ${value}`);
     }
 
     await user.$add('roles', role.id)

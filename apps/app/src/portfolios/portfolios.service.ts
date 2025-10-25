@@ -1,9 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { HttpStatus, Injectable} from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
 import { Portfolio } from './portfolios.model';
 import { CreatePortfolioDto } from  '@app/contracts';
 import { PortfolioAssets } from '@app/assets/portfolio-assets.model';
 import { Transaction } from '@app/transactions/transactions.model';
+import { rpcError } from '@app/contracts/common';
 
 @Injectable()
 export class PortfoliosService {
@@ -13,6 +14,8 @@ export class PortfoliosService {
             ) {}
 
   async createPortfolio(dto: CreatePortfolioDto) {
+    const exists = await this.portfolioRepository.findOne({ where: { userId: dto.userId, name: dto.name }});
+    if (exists) rpcError(HttpStatus.CONFLICT, 'PORTFOLIO_EXISTS', `Portfolio "${dto.name}" already exists`);
     const portfolio = await this.portfolioRepository.create(dto)
     return portfolio
   }
@@ -25,7 +28,11 @@ export class PortfoliosService {
   async getPortfolioByName(name: string) {
     const portfolio = await this.portfolioRepository.findOne({where: {name}, include: {all: true, nested: true}, nest: true})
     if (!portfolio) {
-      return { message: `Portfolio with such name ${name} doesn\'t exist`}
+      rpcError(
+        HttpStatus.NOT_FOUND,
+        'PORTFOLIO_NOT_FOUND',
+        `Portfolio with name "${name}" doesn't exist`,
+      );
     }
     return portfolio
   }
@@ -34,7 +41,7 @@ export class PortfoliosService {
     const portfolio = await this.portfolioRepository.findByPk(id)
 
     if (!portfolio) {
-      throw new NotFoundException(`Portfolio ${id} not found`)
+      rpcError(HttpStatus.NOT_FOUND, 'PORTFOLIO_NOT_FOUND', `Portfolio ${id} not found`);
     }
 
     await this.transactionRepository.destroy({where: {portfolioId: id}})

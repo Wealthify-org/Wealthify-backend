@@ -1,9 +1,10 @@
 import { InjectModel } from '@nestjs/sequelize';
 import { Transaction } from './transactions.model';
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { PortfolioAssets } from '@app/assets/portfolio-assets.model';
 import { CreateTransactionDto } from "@app/contracts";
 import { DeleteAllLinkedTransactionsDto } from "@app/contracts";
+import { rpcError } from '@app/contracts/common';
 
 @Injectable()
 export class TransactionsService {
@@ -27,7 +28,7 @@ export class TransactionsService {
   async deleteTransaction(id: number) {
     const transaction = await this.transactionRepository.findByPk(id)
     if (!transaction) {
-      throw new HttpException(`Transaction with id ${id} doesn\'t exist`, HttpStatus.NOT_FOUND)
+      rpcError(HttpStatus.NOT_FOUND, 'TRANSACTION_NOT_FOUND', `Transaction with id ${id} doesn't exist`);
     }
     let portfolioAsset = await this.getOrCreatePortfolioAsset(transaction)
 
@@ -38,7 +39,7 @@ export class TransactionsService {
       }
     }
     if (!portfolioAsset) {
-      throw new HttpException('Failed to create portfolio asset', HttpStatus.INTERNAL_SERVER_ERROR)
+      rpcError(HttpStatus.INTERNAL_SERVER_ERROR, 'PORTFOLIO_ASSET_CREATE_FAILED', 'Failed to create portfolio asset');
     }
 
     if (transaction.dataValues.type === 'BUY') {

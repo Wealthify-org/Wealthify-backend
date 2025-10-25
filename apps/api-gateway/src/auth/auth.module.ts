@@ -6,11 +6,11 @@ import { ClientConfigService } from "../client-config/client-config.service";
 
 import { AuthController } from "./auth.controller";
 import { AuthService } from "./auth.service";
-
-export const APP_CLIENT = "APP_CLIENT";
+import { APP_CLIENT } from "./constant";
+import { GatewayAuthModule } from "./gateway-auth.module";
 
 @Module({
-  imports: [ClientConfigModule],
+  imports: [GatewayAuthModule, ClientConfigModule],
   controllers: [AuthController],
   providers: [
     AuthService,

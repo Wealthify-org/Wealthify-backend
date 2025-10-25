@@ -1,0 +1,1 @@
+export type MsError = { status?: number; code?: string; message?: string };
