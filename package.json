@@ -7,17 +7,21 @@
   "license": "UNLICENSED",
   "scripts": {
     "build": "nest build",
-    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
-    "start": "nest start",
-    "start:dev": "cross-env NODE_ENV=development nest start --watch",
-    "start:debug": "nest start --debug --watch",
-    "start:prod": "cross-env NODE_ENV=production node dist/main",
+    "start:gateway:dev": "cross-env NODE_ENV=development nest start api-gateway --watch",
+    "start:app:dev": "cross-env NODE_ENV=development nest start app --watch",
+    "start:worker:dev": "cross-env NODE_ENV=development nest start crypto-data-worker --watch",
+    "start:all:dev": "concurrently -k -n GATEWAY,APP,WORKER -c auto \"npm run start:gateway:dev\" \"npm run start:app:dev\" \"npm run start:worker:dev\"",
+    "dev": "npm run start:all:dev",
+    "start:gateway:prod": "node -r tsconfig-paths/register dist/apps/api-gateway/main.js",
+    "start:app:prod": "node -r tsconfig-paths/register dist/apps/app/main.js",
+    "start:worker:prod": "node -r tsconfig-paths/register dist/apps/crypto-data-worker/main.js",
+    "start:all:prod": "npm run build && concurrently -k -n GATEWAY,APP,WORKER -c auto \"npm run start:gateway:prod\" \"npm run start:app:prod\" \"npm run start:worker:prod\"",
+    "format": "prettier --write \"apps/**/*.ts\" \"libs/**/*.ts\"",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
-    "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.6",
@@ -25,6 +29,7 @@
     "@nestjs/core": "^11.1.6",
     "@nestjs/jwt": "^11.0.0",
     "@nestjs/mapped-types": "^2.1.0",
+    "@nestjs/microservices": "^11.1.6",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.1.6",
     "@nestjs/sequelize": "^11.0.1",
@@ -57,6 +62,7 @@
     "@types/jest": "^29.5.14",
     "@types/node": "^22.10.7",
     "@types/supertest": "^6.0.2",
+    "concurrently": "^9.2.1",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.1",
     "eslint-plugin-prettier": "^5.2.2",
@@ -78,7 +84,7 @@
       "json",
       "ts"
     ],
-    "rootDir": "src",
+    "rootDir": ".",
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
@@ -86,8 +92,11 @@
     "collectCoverageFrom": [
       "**/*.(t|j)s"
     ],
-    "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "coverageDirectory": "./coverage",
+    "testEnvironment": "node",
+    "roots": [
+      "<rootDir>/apps/"
+    ]
   },
   "overrides": {}
 }
