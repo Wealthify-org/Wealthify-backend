@@ -1,7 +1,8 @@
-// apps/crypto-data-worker/src/models/crypto-candle.model.ts
 import { Table, Model, Column, DataType, ForeignKey, BelongsTo } from 'sequelize-typescript';
 import { ApiProperty } from '@nestjs/swagger';
-import { CryptoAsset } from "./crypto-asset-data.model";
+import { CryptoAssetData } from "./crypto-asset-data.model";
+
+/* TODO */
 
 export enum CandleInterval {
   MIN1 = '1m',
@@ -42,7 +43,7 @@ export class CryptoCandle extends Model<CryptoCandle, CryptoCandleCreationAttrs>
   declare id: number;
 
   @ApiProperty({ example: 1, description: 'ID из crypto_assets' })
-  @ForeignKey(() => CryptoAsset)
+  @ForeignKey(() => CryptoAssetData)
   @Column({ type: DataType.INTEGER, allowNull: false })
   declare assetId: number;
 
@@ -78,6 +79,6 @@ export class CryptoCandle extends Model<CryptoCandle, CryptoCandleCreationAttrs>
   @Column({ type: DataType.DECIMAL(38, 12), allowNull: true })
   declare marketCapUsd?: string;
 
-  @BelongsTo(() => CryptoAsset)
-  declare asset?: CryptoAsset;
+  @BelongsTo(() => CryptoAssetData)
+  declare asset?: CryptoAssetData;
 }

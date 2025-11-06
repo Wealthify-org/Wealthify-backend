@@ -13,8 +13,6 @@ import { TransactionsModule } from '@app/transactions/transactions.module';
   imports: [
     SequelizeModule.forFeature([Asset, Portfolio, PortfolioAssets]),
     TransactionsModule,
-    // RolesModule,
-    // AuthModule
   ],
   exports: [
     AssetsService

@@ -1,52 +1,50 @@
-// apps/crypto-data-worker/src/models/crypto-asset.model.ts
-import { Table, Model, Column, DataType, HasMany, Index } from 'sequelize-typescript';
+import { Table, Model, Column, DataType, HasMany, Index, HasOne, ForeignKey, Unique } from 'sequelize-typescript';
 import { ApiProperty } from '@nestjs/swagger';
-import { CryptoCandle } from "./crypto-candle.model";
+import { Sparkline7D } from '@app/contracts';
+import { CryptoChartsData } from './crypto-charts-data.model';
+import { Asset } from './asset.model';
 
 export interface CryptoAssetCreationAttrs {
   ticker: string;
   name: string;
+
+  assetId: number;
+
   description?: string;
   slug?: string;
   logoUrl?: string;
-  websiteUrl?: string;
-  sector?: string;           // категория/сектор (Layer1, DeFi, NFT и т.п.)
-  source?: string;           // источник данных (coingecko, cmc, binance и т.п.)
-  isActive?: boolean;
+  categories?: string;
+  
+  source?: string;
 
-  // snapshot метрики (опционально, воркер обновляет периодически)
-  priceUsd?: string;         // DECIMAL как строка
-  priceBtc?: string;
-  marketCapUsd?: string;
-  volume24hUsd?: string;
-  change1hPct?: string;
-  change24hPct?: string;
-  change7dPct?: string;
-  circulatingSupply?: string;
-  totalSupply?: string;
-  maxSupply?: string;
   rank?: number;
-  sparkline7d?: any;         // массив чисел, храним в JSONB
+  currentPriceUsd?: number;
+  
+  marketCapUsd?: number;
+  fdvUsd?: number;
+  circulatingSupply?: number;
+  totalSupply?: number;
+  maxSupply: string | null;
+  volume24HUsd?: number
+
+  change1HUsdPct?: number;
+  change24HUsdPct?: number;
+  change7DUsdPct?: number;
+  change14DUsdPct?: number;
+  change30DUsdPct?: number;
+  change1YUsdPct?: number;
+
+  sparkline7D?: Sparkline7D;
   lastUpdatedAt?: Date;
 }
 
-@Table({
-  tableName: 'crypto_assets',
-  timestamps: true,
-  indexes: [
-    { unique: true, fields: ['ticker'] },
-    { fields: ['slug'] },
-    { fields: ['isActive'] },
-    { fields: ['rank'] },
-  ],
-})
-export class CryptoAsset extends Model<CryptoAsset, CryptoAssetCreationAttrs> {
+@Table({tableName: 'crypto_assets'})
+export class CryptoAssetData extends Model<CryptoAssetData, CryptoAssetCreationAttrs> {
   @ApiProperty({ example: 1, description: 'ID актива' })
   @Column({ type: DataType.INTEGER, primaryKey: true, autoIncrement: true })
   declare id: number;
 
   @ApiProperty({ example: 'BTC', description: 'Уникальный тикер' })
-  @Index({ unique: true })
   @Column({ type: DataType.STRING(32), allowNull: false, unique: true })
   declare ticker: string;
 
@@ -66,67 +64,69 @@ export class CryptoAsset extends Model<CryptoAsset, CryptoAssetCreationAttrs> {
   @Column({ type: DataType.STRING(1024), allowNull: true })
   declare logoUrl?: string;
 
-  @ApiProperty({ example: 'https://bitcoin.org', required: false })
-  @Column({ type: DataType.STRING(1024), allowNull: true })
-  declare websiteUrl?: string;
-
-  @ApiProperty({ example: 'Layer1', required: false })
-  @Column({ type: DataType.STRING(128), allowNull: true })
-  declare sector?: string;
+  @ApiProperty({ example: 'Layer1;Store of Value', required: false })
+  @Column({ type: DataType.STRING, allowNull: true })
+  declare categories?: string;
 
   @ApiProperty({ example: 'coingecko', required: false })
   @Column({ type: DataType.STRING(64), allowNull: true })
   declare source?: string;
 
-  @ApiProperty({ example: true, description: 'Актив торгуется/активен', required: false })
-  @Column({ type: DataType.BOOLEAN, allowNull: false, defaultValue: true })
-  declare isActive: boolean;
-
-  // -------- snapshot метрики (decimal -> string) --------
-
-  @ApiProperty({ example: '68000.123456', description: 'Текущая цена в USD (snapshot)', required: false })
-  @Column({ type: DataType.DECIMAL(30, 12), allowNull: true })
-  declare priceUsd?: string;
-
-  @ApiProperty({ example: '1.00000000', description: 'Цена в BTC (для альтов)', required: false })
-  @Column({ type: DataType.DECIMAL(30, 12), allowNull: true })
-  declare priceBtc?: string;
-
-  @ApiProperty({ example: '1340000000000', description: 'Рыночная капитализация USD', required: false })
-  @Column({ type: DataType.DECIMAL(38, 12), allowNull: true })
-  declare marketCapUsd?: string;
-
-  @ApiProperty({ example: '32000000000', description: 'Объём торгов за 24ч USD', required: false })
-  @Column({ type: DataType.DECIMAL(38, 12), allowNull: true })
-  declare volume24hUsd?: string;
-
-  @ApiProperty({ example: '0.52', description: 'Изменение за 1ч, %', required: false })
-  @Column({ type: DataType.DECIMAL(20, 8), allowNull: true })
-  declare change1hPct?: string;
-
-  @ApiProperty({ example: '-2.15', description: 'Изменение за 24ч, %', required: false })
-  @Column({ type: DataType.DECIMAL(20, 8), allowNull: true })
-  declare change24hPct?: string;
-
-  @ApiProperty({ example: '5.42', description: 'Изменение за 7д, %', required: false })
-  @Column({ type: DataType.DECIMAL(20, 8), allowNull: true })
-  declare change7dPct?: string;
-
-  @ApiProperty({ example: '19500000', description: 'В обращении', required: false })
-  @Column({ type: DataType.DECIMAL(38, 12), allowNull: true })
-  declare circulatingSupply?: string;
-
-  @ApiProperty({ example: '21000000', description: 'Всего выпущено', required: false })
-  @Column({ type: DataType.DECIMAL(38, 12), allowNull: true })
-  declare totalSupply?: string;
-
-  @ApiProperty({ example: '21000000', description: 'Максимальная эмиссия', required: false })
-  @Column({ type: DataType.DECIMAL(38, 12), allowNull: true })
-  declare maxSupply?: string;
-
   @ApiProperty({ example: 1, description: 'Ранг по рыночной капитализации', required: false })
   @Column({ type: DataType.INTEGER, allowNull: true })
   declare rank?: number;
+
+  @ApiProperty({ example: '68000.123456', description: 'Текущая цена в USD (snapshot)', required: false })
+  @Column({ type: DataType.DOUBLE, allowNull: true })
+  declare currentPriceUsd?: number;
+
+  @ApiProperty({ example: '1340000000000', description: 'Рыночная капитализация USD', required: false })
+  @Column({ type: DataType.DOUBLE, allowNull: true })
+  declare marketCapUsd?: number;
+
+  @ApiProperty({ example: '1340000000', description: 'Полностью разводнённая капитализация USD' })
+  @Column({ type: DataType.DOUBLE, allowNull: true })
+  declare fdvUsd: number;
+
+  @ApiProperty({ example: '19500000', description: 'В обращении', required: false })
+  @Column({ type: DataType.DOUBLE, allowNull: true })
+  declare circulatingSupply?: number;
+
+  @ApiProperty({ example: '21000000', description: 'Всего выпущено', required: false })
+  @Column({ type: DataType.DOUBLE, allowNull: true })
+  declare totalSupply?: number;
+
+ @ApiProperty({ example: '21000000', description: 'Максимальная эмиссия. Может быть числом в строке или unnlimited', required: false })
+  @Column({ type: DataType.STRING, allowNull: true, })
+  declare maxSupply: string | null;
+
+  @ApiProperty({ example: '32000000000', description: 'Объём торгов за 24ч USD', required: false })
+  @Column({ type: DataType.DOUBLE, allowNull: true })
+  declare volume24HUsd?: number;
+
+  @ApiProperty({ example: '0.52', description: 'Изменение за 1ч, %', required: false })
+  @Column({ type: DataType.DOUBLE, allowNull: true })
+  declare change1HUsdPct?: number;
+
+  @ApiProperty({ example: '-2.15', description: 'Изменение за 24ч, %', required: false })
+  @Column({ type: DataType.DOUBLE, allowNull: true })
+  declare change24HUsdPct?: number;
+
+  @ApiProperty({ example: '5.42', description: 'Изменение за 7д, %', required: false })
+  @Column({ type: DataType.DOUBLE, allowNull: true })
+  declare change7DUsdPct?: number;
+
+  @ApiProperty({ example: '-5.42', description: 'Изменение за 14 дней, %' })
+  @Column({ type: DataType.DOUBLE, allowNull: true })
+  declare change14DUsdPct?: number;
+
+  @ApiProperty({ example: '-54.42', description: 'Изменение за 30 дней, %' })
+  @Column({ type: DataType.DOUBLE, allowNull: true })
+  declare change30DUsdPct?: number;
+
+  @ApiProperty({ example: '-54.42', description: 'Изменение за 1 год, %' })
+  @Column({ type: DataType.DOUBLE, allowNull: true })
+  declare change1YUsdPct?: number;
 
   @ApiProperty({
     description: 'Спарклайн за 7 дней (массив цен), хранится как JSON',
@@ -134,7 +134,7 @@ export class CryptoAsset extends Model<CryptoAsset, CryptoAssetCreationAttrs> {
     example: { prices: [67000.1, 67125.5, 66543.2] },
   })
   @Column({ type: DataType.JSONB, allowNull: true })
-  declare sparkline7d?: any;
+  declare sparkline7D?: Sparkline7D;
 
   @ApiProperty({ example: '2025-10-24T13:39:03.920Z', description: 'Время последнего обновления снапшота', required: false })
   @Column({ type: DataType.DATE, allowNull: true })
@@ -142,7 +142,22 @@ export class CryptoAsset extends Model<CryptoAsset, CryptoAssetCreationAttrs> {
 
   // -------- relations --------
 
-  @ApiProperty({ type: () => [CryptoCandle], required: false })
-  @HasMany(() => CryptoCandle)
-  declare candles?: CryptoCandle[];
+  @ApiProperty({ example: 42, required: false })
+  @ForeignKey(() => Asset)
+  @Unique('uq_assets_data')
+  @Column({ type: DataType.INTEGER, allowNull: false })
+  declare assetId: number
+  
+  // связь 1:1 с таблицей графиков
+  @ApiProperty({ type: () => CryptoChartsData, required: false })
+  @HasOne(() => CryptoChartsData, {
+    foreignKey: 'assetDataId',     // имя FK в таблице CryptoChartsData
+    onDelete: 'CASCADE',        // удаляем графики при удалении актива
+    onUpdate: 'CASCADE',
+  })
+  declare charts?: CryptoChartsData;
+
+  // @ApiProperty({ type: () => [CryptoCandle], required: false })
+  // @HasMany(() => CryptoCandle)
+  // declare candles?: CryptoCandle[];
 }

@@ -28,3 +28,6 @@ export * from "./common/rpc/rpc-error.type";
 export * from "./common/types/user-payload.type";
 
 export * from "./common/validation/password.constants";
+
+export * from "./crypto-data-worker/types/crypto-data-worker.types";
+export * from "./crypto-data-worker/constants/crypto-data-worker.constants";

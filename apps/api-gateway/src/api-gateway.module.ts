@@ -8,6 +8,7 @@ import { RolesModule } from '@gateway/roles/roles.module';
 import { TransactionsModule } from '@gateway/transactions/transactions.module';
 import { UsersModule } from '@gateway/users/users.module';
 import { ConfigModule } from '@nestjs/config';
+import { CryptoDataWorkerModule } from './crypto-data-worker/crypto-data-worker.module';
 
 @Module({
   imports: [
@@ -19,7 +20,8 @@ import { ConfigModule } from '@nestjs/config';
     PortfoliosModule,
     RolesModule,
     TransactionsModule,
-    UsersModule
+    UsersModule,
+    CryptoDataWorkerModule,
   ],
   controllers: [ApiGatewayController],
   providers: [ApiGatewayService],

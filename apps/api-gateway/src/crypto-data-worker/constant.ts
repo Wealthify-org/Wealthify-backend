@@ -1,0 +1,1 @@
+export const WORKER_CLIENT = 'WORKER_CLIENT';

@@ -1,8 +1,9 @@
-import { Table, Model, Column, DataType, BelongsToMany } from "sequelize-typescript"
+import { Table, Model, Column, DataType, BelongsToMany, HasOne } from "sequelize-typescript"
 import { Portfolio } from "@app/portfolios/portfolios.model"
 import { PortfolioAssets } from "./portfolio-assets.model"
 import { AssetType } from "@app/contracts"
 import { ApiProperty } from "@nestjs/swagger"
+import { CryptoAssetData } from "@crypto-worker/models/crypto-asset-data.model"
 
 interface AssetCreationAttrs {
   name: string
@@ -32,4 +33,13 @@ export class Asset extends Model<Asset, AssetCreationAttrs> {
   @ApiProperty({ type: () => [Portfolio], description: 'Портфели, в которых содержится данный актив', required: false })
   @BelongsToMany(() => Portfolio, () => PortfolioAssets)
   declare portfolios: Portfolio[]
+
+  @ApiProperty({ type: () => CryptoAssetData, required: false })
+  @HasOne(() => CryptoAssetData, {
+    foreignKey: 'assetId',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  })
+  declare assetData: CryptoAssetData;
+  
 }

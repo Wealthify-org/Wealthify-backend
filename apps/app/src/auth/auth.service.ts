@@ -44,6 +44,7 @@ export class AuthService {
     const hashPassword = await bcrypt.hash(userDto.password, this.hashComplexity)
     const user = await this.userService.createUser({...userDto, password: hashPassword})
     const tokens = await this.generateUserTokens(user)
+    console.log('USER', user.dataValues)
     return { ...tokens, user: this.safeUser(user)}
   }
 
@@ -221,6 +222,7 @@ export class AuthService {
 
   private safeUser(user: User) {
     const raw = (user as any).toJSON?.() ?? (user as any).dataValues ?? user
+    console.log("ROOOW", raw);
     const { password, ...rest } = raw
     return rest
   }
