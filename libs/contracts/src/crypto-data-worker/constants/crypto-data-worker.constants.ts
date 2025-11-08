@@ -1,4 +1,4 @@
-import { RangeKey } from "@app/contracts/crypto-data-worker";
+import { RangeKey } from "@libs/contracts/crypto-data-worker";
 
 export const RangeToButton: Record<RangeKey, string> = {
   h24: '#range-24h',

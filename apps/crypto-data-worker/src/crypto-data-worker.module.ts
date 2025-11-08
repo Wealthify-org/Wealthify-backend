@@ -3,12 +3,10 @@ import { CryptoDataWorkerController } from './crypto-data-worker.controller';
 import { CryptoDataScrapperService } from './crypto-data-scrapper.service';
 import { ScheduleModule } from '@nestjs/schedule';
 import { SequelizeModule } from '@nestjs/sequelize';
-import { CryptoAssetData } from './models/crypto-asset-data.model';
-import { CryptoCandle } from './models/crypto-candle.model';
+import { CryptoAssetData, CryptoCandle, CryptoChartsData } from "@libs/crypto-data/models";
 import { PuppeteerService } from './puppeteer.service';
 import { ConfigModule } from '@nestjs/config';
-import { CryptoChartsData } from './models/crypto-charts-data.model';
-import { Asset } from './models/asset.model';
+import { Asset } from "@libs/crypto-data/models";
 import { CryptoDataWorkerService } from './crypto-data-worker.service';
 
 @Module({

@@ -1,6 +1,6 @@
-import { Table, Model, Column, DataType, HasMany, Index, HasOne, ForeignKey, Unique } from 'sequelize-typescript';
+import { Table, Model, Column, DataType, HasMany, Index, HasOne, ForeignKey, Unique, BelongsTo } from 'sequelize-typescript';
 import { ApiProperty } from '@nestjs/swagger';
-import { Sparkline7D } from '@app/contracts';
+import { Sparkline7D } from '@libs/contracts';
 import { CryptoChartsData } from './crypto-charts-data.model';
 import { Asset } from './asset.model';
 
@@ -147,6 +147,9 @@ export class CryptoAssetData extends Model<CryptoAssetData, CryptoAssetCreationA
   @Unique('uq_assets_data')
   @Column({ type: DataType.INTEGER, allowNull: false })
   declare assetId: number
+
+  @BelongsTo(() => Asset)
+  declare asset?: Asset;
   
   // связь 1:1 с таблицей графиков
   @ApiProperty({ type: () => CryptoChartsData, required: false })

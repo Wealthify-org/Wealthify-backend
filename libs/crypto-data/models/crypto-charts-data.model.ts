@@ -1,4 +1,4 @@
-import { SeriesPoint } from "@app/contracts";
+import { SeriesPoint } from "@libs/contracts";
 import { ApiProperty } from "@nestjs/swagger";
 import { BelongsTo, Column, DataType, ForeignKey, Model, Table, Unique } from "sequelize-typescript";
 import { CryptoAssetData } from "./crypto-asset-data.model";

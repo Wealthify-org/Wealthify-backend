@@ -1,8 +1,8 @@
 import { Controller } from '@nestjs/common';
 import { RolesService } from './roles.service';
-import { CreateRoleDto } from '@app/contracts';
+import { CreateRoleDto } from '@libs/contracts';
 import { MessagePattern, Payload } from '@nestjs/microservices';
-import { ROLES_PATTERNS } from '@app/contracts/roles/roles.pattern';
+import { ROLES_PATTERNS } from '@libs/contracts/roles/roles.pattern';
 
 @Controller()
 export class RolesController {

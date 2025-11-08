@@ -1,14 +1,13 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 const puppeteer = require('puppeteer-extra'); // оставил CJS, как у тебя
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
-import type { Browser, HTTPResponse, Page } from 'puppeteer';
+import type { Browser, Page } from 'puppeteer';
 
 puppeteer.use(StealthPlugin());
 
 @Injectable()
 export class PuppeteerService implements OnModuleDestroy {
   private browser: Browser | null = null;
-  private baseUrl = 'https://www.coingecko.com/en/all-cryptocurrencies';
 
   async getBrowser(): Promise<Browser> {
     if (this.browser) {

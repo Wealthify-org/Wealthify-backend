@@ -6,7 +6,7 @@ import {
   RangeToButton,
   RangeToPriceChartsFile,
   RangeToDaysParam,
-} from '@app/contracts/crypto-data-worker';
+} from '@libs/contracts/crypto-data-worker';
 
 import type {
   RangeKey,
@@ -16,7 +16,7 @@ import type {
   ExtractedCoinFields,
   Sparkline7D,
   SeriesPoint,
-} from '@app/contracts/crypto-data-worker';
+} from '@libs/contracts/crypto-data-worker';
 import { HTTPResponse, Page } from 'puppeteer';
 import { CryptoDataWorkerService } from './crypto-data-worker.service';
 
@@ -32,7 +32,7 @@ export class CryptoDataScrapperService {
     private readonly cryproDataWorkerService: CryptoDataWorkerService,
   ) {}
 
-  @Cron('*/5 * * * *') // каждые 5 минут
+  @Cron('*/1 * * * *') // каждые 5 минут
   async collectAllAssetsDataCron() {
     if (this.isRunning) {
       this.log.warn('Previous collectAllAssets run is still in progress, skipping this tick');

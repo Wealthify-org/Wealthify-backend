@@ -1,9 +1,9 @@
 import { Table, Model, Column, DataType, BelongsToMany, HasOne } from "sequelize-typescript"
 import { Portfolio } from "@app/portfolios/portfolios.model"
 import { PortfolioAssets } from "./portfolio-assets.model"
-import { AssetType } from "@app/contracts"
+import { AssetType } from "@libs/contracts"
 import { ApiProperty } from "@nestjs/swagger"
-import { CryptoAssetData } from "@crypto-worker/models/crypto-asset-data.model"
+import { CryptoAssetData } from "@libs/crypto-data/models"
 
 interface AssetCreationAttrs {
   name: string

@@ -1,9 +1,9 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { User } from './users.model';
 import { InjectModel } from '@nestjs/sequelize';
-import { CreateUserDto, AddRoleDto } from "@app/contracts";
+import { CreateUserDto, AddRoleDto } from "@libs/contracts";
 import { RolesService } from '@app/roles/roles.service';
-import { rpcError } from '@app/contracts/common';
+import { rpcError } from '@libs/contracts/common';
 
 @Injectable()
 export class UsersService {

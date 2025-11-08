@@ -1,10 +1,10 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { HttpStatus, Injectable, Logger } from "@nestjs/common";
 import { InjectConnection, InjectModel } from "@nestjs/sequelize";
-import { CryptoAssetCreationAttrs, CryptoAssetData } from "./models/crypto-asset-data.model";
-import { CryptoChartsData } from "./models/crypto-charts-data.model";
-import { Asset } from './models/asset.model';
+import { CryptoAssetCreationAttrs, CryptoAssetData, CryptoChartsData } from "@libs/crypto-data/models";
+import { Asset } from '../../../libs/crypto-data/models/asset.model';
 import { Sequelize } from "sequelize";
-import { AssetType, ChartPayload, CryptoData, RangeKey, SeriesPoint } from "@app/contracts";
+import { AssetType, ChartPayload, CryptoData, RangeKey, SeriesPoint } from "@libs/contracts";
+import { rpcError } from "@libs/contracts/common";
 
 
 @Injectable()
@@ -20,6 +20,72 @@ export class CryptoDataWorkerService {
     @InjectConnection()
     private readonly sequelize: Sequelize,
   ) {}
+
+  // ЧТЕНИЕ ДАННЫХ
+  /* TODO: Перенести операции чтения в отдельный микросервис с активами как crypto-data-reader*/
+  async getAssetByTicker(ticker: string) {
+    const upper = ticker.toUpperCase();
+
+    const assetData = await this.cryptoAssetRepo.findOne({
+      where: {ticker: upper},
+      include: [
+        { model: this.assetRepo, required: false }
+      ],
+    });
+
+    if (!assetData) {
+      rpcError(
+        HttpStatus.NOT_FOUND,
+        'ASSET_NOT_FOUND',
+        `Asset with ticker ${upper} not found`,
+      );
+    }
+
+    return assetData;
+  }
+
+  async listAssets(params?: { limit?: number; offset?: number }) {
+    const limit = 
+      params?.limit && params.limit > 0 && params.limit <= 200 ? params.limit : 50;
+    const offset = params?.offset && params.offset >= 0 ? params.offset : 0;
+
+    const { rows, count } = await this.cryptoAssetRepo.findAndCountAll({
+      limit,
+      offset,
+      order: [['rank', 'ASC']],
+      include: [
+        { model: this.assetRepo, required: false },
+      ],
+    });
+
+    return {
+      items: rows,
+      total: count,
+      limit, 
+      offset,
+    };
+  }
+
+  async getChartsByTicker(ticker: string) {
+    const upper = ticker.toUpperCase();
+
+    const assetData = await this.cryptoAssetRepo.findOne({
+      where: { ticker: upper },
+      include: [{ model: this.chartsRepo, required: false }],
+    });
+
+    if (!assetData) {
+      rpcError(
+        HttpStatus.NOT_FOUND,
+        'ASSET_NOT_FOUND',
+        `Asset with ticker ${upper} not found`,
+      );
+    }
+
+    return assetData.charts ?? null;
+  }
+
+  // ЗАПИСЬ ДАННЫХ
 
   async upsertFromCryptoData(payload: CryptoData) {
     const {

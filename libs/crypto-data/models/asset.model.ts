@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Column, DataType, Model, Table } from 'sequelize-typescript';
-import { AssetType } from '@app/contracts';
+import { Column, DataType, HasOne, Model, Table } from 'sequelize-typescript';
+import { AssetType } from '@libs/contracts';
+import { CryptoAssetData } from './crypto-asset-data.model';
 
 interface WorkerAssetCreationAttrs {
   name: string;
@@ -25,4 +26,11 @@ export class Asset extends Model<Asset, WorkerAssetCreationAttrs> {
   @ApiProperty({ example: 'Crypto', enum: AssetType })
   @Column({ type: DataType.ENUM(...Object.values(AssetType)), allowNull: false })
   declare type: AssetType;
+
+  @HasOne(() => CryptoAssetData, {
+    foreignKey: 'assetId',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  })
+  declare assetData: CryptoAssetData;
 }

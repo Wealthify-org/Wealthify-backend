@@ -5,9 +5,9 @@ import {
   AddAssetToPortfolioDto,
   SellAssetDto,
   RemoveAssetFromPortfolioDto,
-} from "@app/contracts";
+} from "@libs/contracts";
 import { MessagePattern, Payload } from '@nestjs/microservices';
-import { ASSETS_PATTERNS } from '@app/contracts/assets/assets.pattern';
+import { ASSETS_PATTERNS } from '@libs/contracts/assets/assets.pattern';
 
 @Controller()
 export class AssetsController {

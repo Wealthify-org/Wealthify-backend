@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { CreateUserDto } from  '@app/contracts';
+import { CreateUserDto } from  '@libs/contracts';
 import { UsersService } from '@app/users/users.service';
 import * as bcrypt from 'bcryptjs'
 import { InjectModel } from '@nestjs/sequelize';
@@ -8,14 +8,14 @@ import { RefreshToken } from './refresh-token.model';
 import { ResetToken } from './reset-token-model';
 import { v4 as uuidv4 } from 'uuid'
 import { Op } from 'sequelize';
-import { ChangePasswordDto } from  '@app/contracts';
-import { ForgotPasswordDto } from  '@app/contracts';
+import { ChangePasswordDto } from  '@libs/contracts';
+import { ForgotPasswordDto } from  '@libs/contracts';
 import { MailService } from '@app/common/services/mail.service';
-import { ResetPasswordDto } from  '@app/contracts';
-import { LoginDto } from  '@app/contracts';
-import { UserPayload } from  '@app/contracts/common/types/user-payload.type';
+import { ResetPasswordDto } from  '@libs/contracts';
+import { LoginDto } from  '@libs/contracts';
+import { UserPayload } from  '@libs/contracts/common/types/user-payload.type';
 import { User } from '@app/users/users.model';
-import { rpcError } from '@app/contracts/common/rpc/rpc-error';
+import { rpcError } from '@libs/contracts/common/rpc/rpc-error';
 
 @Injectable()
 export class AuthService {

@@ -3,7 +3,7 @@ import { ClientProxy } from '@nestjs/microservices';
 import { firstValueFrom } from 'rxjs';
 
 import { APP_CLIENT } from './constant';
-import { AUTH_PATTERNS } from '@app/contracts/auth/auth.pattern';
+import { AUTH_PATTERNS } from '@libs/contracts/auth/auth.pattern';
 
 import {
   LoginDto,
@@ -11,9 +11,9 @@ import {
   ChangePasswordDto,
   ForgotPasswordDto,
   ResetPasswordDto,
-} from '@app/contracts';
+} from '@libs/contracts';
 
-import { sendOrThrow } from '@app/contracts/common/rpc/client';
+import { sendOrThrow } from '@libs/contracts/common/rpc/client';
 
 @Injectable()
 export class AuthService {

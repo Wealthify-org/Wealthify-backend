@@ -2,9 +2,9 @@ import { InjectModel } from '@nestjs/sequelize';
 import { Transaction } from './transactions.model';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { PortfolioAssets } from '@app/assets/portfolio-assets.model';
-import { CreateTransactionDto } from "@app/contracts";
-import { DeleteAllLinkedTransactionsDto } from "@app/contracts";
-import { rpcError } from '@app/contracts/common';
+import { CreateTransactionDto } from "@libs/contracts";
+import { DeleteAllLinkedTransactionsDto } from "@libs/contracts";
+import { rpcError } from '@libs/contracts/common';
 
 @Injectable()
 export class TransactionsService {

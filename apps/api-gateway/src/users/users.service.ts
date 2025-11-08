@@ -3,9 +3,9 @@ import { ClientProxy } from '@nestjs/microservices';
 import { firstValueFrom } from 'rxjs';
 
 import { APP_CLIENT } from "./constant";
-import { USERS_PATTERNS } from '@app/contracts/users/users.pattern';
-import { CreateUserDto, AddRoleDto } from '@app/contracts';
-import { sendOrThrow } from '@app/contracts/common/rpc/client';
+import { USERS_PATTERNS } from '@libs/contracts/users/users.pattern';
+import { CreateUserDto, AddRoleDto } from '@libs/contracts';
+import { sendOrThrow } from '@libs/contracts/common/rpc/client';
 
 @Injectable()
 export class UsersService {

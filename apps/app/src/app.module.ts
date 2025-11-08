@@ -16,8 +16,8 @@ import { TransactionsModule } from './transactions/transactions.module';
 import { Transaction } from "./transactions/transactions.model";
 import { RefreshToken } from "./auth/refresh-token.model";
 import { ResetToken } from "./auth/reset-token-model";
-import { CryptoAssetData } from "@crypto-worker/models/crypto-asset-data.model";
-import { CryptoChartsData } from "@crypto-worker/models/crypto-charts-data.model";
+import { CryptoAssetData } from "@libs/crypto-data/models";
+import { CryptoChartsData } from "@libs/crypto-data/models";
 
 @Module({
   imports: [
