@@ -69,7 +69,7 @@ export class CryptoAssetData extends Model<CryptoAssetData, CryptoAssetCreationA
   declare categories?: string;
 
   @ApiProperty({ example: 'coingecko', required: false })
-  @Column({ type: DataType.STRING(64), allowNull: true })
+  @Column({ type: DataType.TEXT, allowNull: true })
   declare source?: string;
 
   @ApiProperty({ example: 1, description: 'Ранг по рыночной капитализации', required: false })
