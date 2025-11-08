@@ -8,7 +8,7 @@ interface WorkerAssetCreationAttrs {
   type: AssetType;
 }
 
-@Table({ tableName: 'assets' }) // та же таблица, что и в APP
+@Table({ tableName: 'assets' }) // та же таблица, что и в app
 export class Asset extends Model<Asset, WorkerAssetCreationAttrs> {
   @ApiProperty({ example: 1, description: 'ID актива' })
   @Column({ type: DataType.INTEGER, primaryKey: true, autoIncrement: true })

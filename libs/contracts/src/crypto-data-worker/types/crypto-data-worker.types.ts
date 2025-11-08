@@ -1,6 +1,4 @@
-// libs/crypto-types/src/lib/crypto.types.ts
-
-/** Базовые типы графиков */
+// базовые типы графиков 
 export type SeriesPoint = [number, number];
 
 export type ChartPayload = {
@@ -16,11 +14,11 @@ export type Sparkline7D = {
   prices: number[];
 };
 
-/** Свечи — сейчас не используются в коде парсера, но переносим как просили */
+
 export type Candle = { t: number; o: number; h: number; l: number; c: number; v?: number };
 export type CandlesByRange = Partial<Record<RangeKey, Candle[]>>;
 
-/** Полные данные по активу */
+
 export type CryptoData = {
   assetName: string;
   assetTicker: string;
@@ -31,7 +29,7 @@ export type CryptoData = {
   fdv: number;
   circulatingSupply: number;
   totalSupply: number;
-  maxSupply: number | string; // может быть '—' или текст
+  maxSupply: number | string; // может быть числом, или знаком бесконечности, или '-'
   volume24H: number;
 
   change1HUsdPct: number;
@@ -44,10 +42,10 @@ export type CryptoData = {
   assetDescription: string;
   assetCategories: string;
 
+  sparkline7D?: Sparkline7D;
   charts?: CryptoCharts;
-  candles?: CandlesByRange; // оставлено как было
+  candles?: CandlesByRange; 
   source: string;
 };
 
-/** Поля, извлекаемые из страницы (без charts/candles/source) */
 export type ExtractedCoinFields = Omit<CryptoData, 'charts' | 'candles' | 'source'>;

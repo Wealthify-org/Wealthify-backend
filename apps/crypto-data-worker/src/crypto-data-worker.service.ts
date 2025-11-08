@@ -120,6 +120,8 @@ export class CryptoDataWorkerService {
       change30DUsdPct: data.change30DUsdPct ?? undefined,
       change1YUsdPct: data.change1YUsdPct ?? undefined,
 
+      sparkline7D: data.sparkline7D,
+      slug: 'coingecko',
       lastUpdatedAt: new Date(),
     };
   }

@@ -11,8 +11,4 @@ export class CryptoDataWorkerService {
   health() {
     return sendOrThrow(this.workerMs, CRYPTO_DATA_WORKER_PATTERS.HEALTH, {});
   }
-
-  collectOnce() {
-    return sendOrThrow(this.workerMs, CRYPTO_DATA_WORKER_PATTERS.COLLECT, {});
-  }
 }

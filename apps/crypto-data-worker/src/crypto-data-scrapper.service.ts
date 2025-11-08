@@ -14,6 +14,8 @@ import type {
   CryptoCharts,
   CryptoData,
   ExtractedCoinFields,
+  Sparkline7D,
+  SeriesPoint,
 } from '@app/contracts/crypto-data-worker';
 import { HTTPResponse, Page } from 'puppeteer';
 import { CryptoDataWorkerService } from './crypto-data-worker.service';
@@ -22,14 +24,22 @@ import { CryptoDataWorkerService } from './crypto-data-worker.service';
 export class CryptoDataScrapperService {
   private readonly log = new Logger('CryptoDataWorker');
   private readonly baseUrl = 'https://www.coingecko.com/en/all-cryptocurrencies';
+  
+  private isRunning = false;
 
   constructor(
     private readonly pp: PuppeteerService,
     private readonly cryproDataWorkerService: CryptoDataWorkerService,
   ) {}
 
-  @Cron('*/5 * * * *')
+  @Cron('*/5 * * * *') // каждые 5 минут
   async collectAllAssetsDataCron() {
+    if (this.isRunning) {
+      this.log.warn('Previous collectAllAssets run is still in progress, skipping this tick');
+      return;
+    }
+
+    this.isRunning = true;
     try {
       await this.collectAllAssets();
     } catch (e) {
@@ -59,28 +69,25 @@ export class CryptoDataScrapperService {
       this.log.log(`Collected ${links.length} links (need first 200).`);
 
       const top = links.slice(0, 200);
-      const href = top[0];
-      this.log.log(`[${0 + 1}/${top.length}] Parsing: ${href}`);
-      try {
-        const data = await this.parseCoin(page, href);
-        // как и раньше — только логируем результат
-        await this.cryproDataWorkerService.upsertFromCryptoData(data);
-        this.log.log(`PARSED DATA - ${JSON.stringify(data, null, 2)}`);
-      } catch (err) {
-        this.log.error(`Failed to parse ${href}: ${err instanceof Error ? err.message : err}`);
-      }
+      for (let i = 0; i < top.length; i++) {
+        const href = top[i];
+        this.log.debug(`[${i + 1}/${top.length}] Parsing: ${href}`);
 
-      // for (let i = 0; i < top.length; i++) {
-      //   const href = top[i];
-      //   this.log.log(`[${i + 1}/${top.length}] Parsing: ${href}`);
-      //   try {
-      //     const data = await this.parseCoin(page, href);
-      //     // как и раньше — только логируем результат
-      //     this.log.log(`PARSED DATA - ${JSON.stringify(data, null, 2)}`);
-      //   } catch (err) {
-      //     this.log.error(`Failed to parse ${href}: ${err instanceof Error ? err.message : err}`);
-      //   }
-      // }
+        try {
+          const data = await this.parseCoin(page, href);
+          await this.cryproDataWorkerService.upsertFromCryptoData(data);
+
+          this.log.debug(
+            `PARSED DATA for ${data.assetTicker} (rank=${data.currentAssetRank}) - ${href}`,
+          );
+        } catch (err) {
+          this.log.warn(
+            `Failed to parse ${href}: ${err instanceof Error ? err.message : err}`,
+          );
+        }
+        // чуть притормаживаем, чтобы не кидать запросы слишком часто
+        await this.sleep(200);
+      }
     } finally {
       await this.pp.onModuleDestroy();
     }
@@ -164,7 +171,6 @@ export class CryptoDataScrapperService {
 
       await this.sleep(150);
       links = await this.collectLinks(page);
-      console.log(`newPage=${pageNum - 1}, +${added}, totalLinks=${links.length}`);
       if (links.length > maxLinks) break;
     }
 
@@ -186,11 +192,9 @@ export class CryptoDataScrapperService {
     for (const range of ['h24', 'd7', 'd30', 'd90', 'd365', 'max'] as RangeKey[]) {
       const payload = await this.clickAndGrabChart(page, range);
       if (!payload) {
-        console.log(`[chart:${range}] payload=null`);
+        this.log.debug(`[chart:${range}] payload=null`);
         continue;
       }
-      console.log(`PAYLOAD:${range} stats(10)=`, payload.stats.slice(0, 10));
-      console.log(`PAYLOAD:${range} vols(10)=`, payload.total_volumes.slice(0, 10));
       chartByRange[range] = payload;
       await this.sleep(200); // дать дорисовать график между кликами
     }
@@ -206,9 +210,26 @@ export class CryptoDataScrapperService {
 
     return {
       ...fields,
+      sparkline7D: this.extractSparklineFromCharts(charts.d7?.stats),
       charts,
       source: link,
     };
+  }
+
+  private extractSparklineFromCharts(chartsD7Stats: SeriesPoint[] | undefined): Sparkline7D | undefined {
+    if (!chartsD7Stats || chartsD7Stats.length === 0) {
+      return undefined;
+    }
+    const sorted = [...chartsD7Stats].sort((a, b) => a[0] - b[0]);
+    const prices = sorted
+      .map(([, price]) => price)
+      .filter((value) => Number.isFinite(value));
+
+    if (prices.length === 0) {
+      return undefined;
+    }
+
+    return { prices };
   }
 
   // cъём одного диапазона графика кликом + фолбэки
@@ -282,9 +303,9 @@ export class CryptoDataScrapperService {
       (async () => {
         try {
           const resp = await waitResp;
-          console.log(
-            `[chart:${range}] ${resp.status()} ${resp.url()} ct=${resp.headers()['content-type']}`
-          );
+          // console.log(
+          //   `[chart:${range}] ${resp.status()} ${resp.url()} ct=${resp.headers()['content-type']}`
+          // );
           return await this.normalizeChartPayload(resp);
         } catch {
           return null;
@@ -295,14 +316,14 @@ export class CryptoDataScrapperService {
 
     if (payload?.stats?.length) return payload;
 
-    console.log(`[chart:${range}] primary+direct failed, trying market_chart fallback`);
+    this.log.debug(`[chart:${range}] primary+direct failed, trying market_chart fallback`);
     const mc = await this.directMarketChartFetch(page, slug, daysParam);
     if (mc?.stats?.length) {
-      console.log(`[chart:${range}] market_chart fallback ok for ${slug} days=${daysParam}`);
+      this.log.debug(`[chart:${range}] market_chart fallback ok for ${slug} days=${daysParam}`);
       return mc;
     }
 
-    console.log(`[chart:${range}] no data after all fallbacks`);
+    this.log.debug(`[chart:${range}] no data after all fallbacks`);
     return null;
   }
 
@@ -599,6 +620,6 @@ function extractCoinDataInPageContext(): ExtractedCoinFields | null {
     change30DUsdPct,
     change1YUsdPct,
     assetDescription,
-    assetCategories,
+    assetCategories
   };
 }

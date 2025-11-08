@@ -12,21 +12,4 @@ export class CryptoDataWorkerController {
   health() {
     return { ok: true, time: new Date().toISOString() };
   }
-
-  @MessagePattern(CRYPTO_DATA_WORKER_PATTERS.COLLECT)
-  collectOnce() {
-    try {
-      return this.cryptoDataScrapperService.collectAllAssetsDataCron();
-    } catch (e: any) {
-      // Превращаем любую ошибку сервиса в RpcException,
-      // чтобы gateway получил корректный status/code/message
-      rpcError(
-        HttpStatus.BAD_GATEWAY,
-        'SCRAPE_FAILED',
-        e?.message ?? 'Scrape failed'
-      );
-    }
-  }
-
-
 }

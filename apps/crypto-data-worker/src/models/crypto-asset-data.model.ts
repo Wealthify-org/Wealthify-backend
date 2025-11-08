@@ -65,7 +65,7 @@ export class CryptoAssetData extends Model<CryptoAssetData, CryptoAssetCreationA
   declare logoUrl?: string;
 
   @ApiProperty({ example: 'Layer1;Store of Value', required: false })
-  @Column({ type: DataType.STRING, allowNull: true })
+  @Column({ type: DataType.TEXT, allowNull: true })
   declare categories?: string;
 
   @ApiProperty({ example: 'coingecko', required: false })
@@ -151,7 +151,7 @@ export class CryptoAssetData extends Model<CryptoAssetData, CryptoAssetCreationA
   // связь 1:1 с таблицей графиков
   @ApiProperty({ type: () => CryptoChartsData, required: false })
   @HasOne(() => CryptoChartsData, {
-    foreignKey: 'assetDataId',     // имя FK в таблице CryptoChartsData
+    foreignKey: 'assetDataId',     // имя fk в таблице CryptoChartsData
     onDelete: 'CASCADE',        // удаляем графики при удалении актива
     onUpdate: 'CASCADE',
   })
