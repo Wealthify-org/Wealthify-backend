@@ -1,10 +1,10 @@
 import { HttpStatus, Injectable} from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
 import { Portfolio } from './portfolios.model';
-import { CreatePortfolioDto } from  '@app/contracts';
+import { CreatePortfolioDto } from  '@libs/contracts';
 import { PortfolioAssets } from '@app/assets/portfolio-assets.model';
 import { Transaction } from '@app/transactions/transactions.model';
-import { rpcError } from '@app/contracts/common';
+import { rpcError } from '@libs/contracts/common';
 
 @Injectable()
 export class PortfoliosService {

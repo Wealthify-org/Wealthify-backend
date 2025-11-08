@@ -8,7 +8,7 @@ import {
   AddAssetToPortfolioDto,
   SellAssetDto,
   RemoveAssetFromPortfolioDto,
-} from '@app/contracts';
+} from '@libs/contracts';
 
 import { JwtAuthGuard } from '@gateway/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@gateway/common/guards/roles.guard';

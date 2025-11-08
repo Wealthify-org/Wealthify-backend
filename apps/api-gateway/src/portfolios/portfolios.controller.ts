@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/c
 import { ApiBody, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 import { PortfoliosService } from './portfolios.service';
-import { CreatePortfolioDto } from '@app/contracts';
+import { CreatePortfolioDto } from '@libs/contracts';
 
 import { JwtAuthGuard } from '@gateway/common/guards/jwt-auth.guard';
 

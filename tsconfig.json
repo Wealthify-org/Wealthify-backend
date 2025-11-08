@@ -18,14 +18,20 @@
     "strictBindCallApply": false,
     "noFallthroughCasesInSwitch": false,
     "paths": {
-      "@app/contracts": [
+      "@libs/contracts": [
         "libs/contracts/src"
       ],
       "@app/*": ["apps/app/src/*"],
       "@gateway/*": ["apps/api-gateway/src/*"],
       "@crypto-worker/*": ["apps/crypto-data-worker/src/*"],
-      "@app/contracts/*": [
+      "@libs/contracts/*": [
         "libs/contracts/src/*"
+      ],
+      "@libs/crypto-data/models": [
+        "libs/crypto-data/models/"
+      ],
+      "@libs/crypto-data/models/*": [
+        "libs/crypto-data/models/*"
       ]
     }
   }

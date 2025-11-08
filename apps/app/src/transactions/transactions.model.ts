@@ -1,7 +1,7 @@
 import { Column, DataType, ForeignKey, Model, Table } from "sequelize-typescript";
 import { Asset } from "@app/assets/assets.model";
 import { Portfolio } from "@app/portfolios/portfolios.model";
-import { TransactionType } from "@app/contracts/common/enums/transaction-type.enum"
+import { TransactionType } from "@libs/contracts/common/enums/transaction-type.enum"
 import { ApiProperty } from "@nestjs/swagger";
 
 interface TransactionCreationAttrs {

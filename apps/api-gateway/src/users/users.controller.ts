@@ -2,7 +2,7 @@ import { Body, Controller, Get, HttpStatus, Post, UseGuards } from '@nestjs/comm
 import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 import { UsersService } from './users.service';
-import { CreateUserDto, AddRoleDto } from '@app/contracts';
+import { CreateUserDto, AddRoleDto } from '@libs/contracts';
 
 import { JwtAuthGuard } from '@gateway/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@gateway/common/guards/roles.guard';

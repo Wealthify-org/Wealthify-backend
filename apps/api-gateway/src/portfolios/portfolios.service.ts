@@ -2,9 +2,9 @@ import { Inject, Injectable } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 
 import { APP_CLIENT } from "./constant";
-import { PORTFOLIOS_PATTERNS } from '@app/contracts/portfolios/portfolios.pattern';
-import { CreatePortfolioDto } from '@app/contracts';
-import { sendOrThrow } from '@app/contracts/common/rpc/client';
+import { PORTFOLIOS_PATTERNS } from '@libs/contracts/portfolios/portfolios.pattern';
+import { CreatePortfolioDto } from '@libs/contracts';
+import { sendOrThrow } from '@libs/contracts/common/rpc/client';
 
 @Injectable()
 export class PortfoliosService {

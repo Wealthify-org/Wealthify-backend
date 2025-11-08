@@ -1,8 +1,8 @@
 import { Controller } from '@nestjs/common';
-import { CreatePortfolioDto } from "@app/contracts";
+import { CreatePortfolioDto } from "@libs/contracts";
 import { PortfoliosService } from './portfolios.service';
 import { MessagePattern, Payload } from '@nestjs/microservices';
-import { PORTFOLIOS_PATTERNS } from '@app/contracts/portfolios/portfolios.pattern';
+import { PORTFOLIOS_PATTERNS } from '@libs/contracts/portfolios/portfolios.pattern';
 
 @Controller()
 export class PortfoliosController {

@@ -16,6 +16,8 @@ import { TransactionsModule } from './transactions/transactions.module';
 import { Transaction } from "./transactions/transactions.model";
 import { RefreshToken } from "./auth/refresh-token.model";
 import { ResetToken } from "./auth/reset-token-model";
+import { CryptoAssetData } from "@libs/crypto-data/models";
+import { CryptoChartsData } from "@libs/crypto-data/models";
 
 @Module({
   imports: [
@@ -29,7 +31,7 @@ import { ResetToken } from "./auth/reset-token-model";
       username: process.env.POSTGRES_USER,
       password: process.env.POSTGRES_PASSWORD,
       database: process.env.POSTGRES_DB,
-      models: [User, RefreshToken, ResetToken, Role, UserRoles, Asset, Portfolio, PortfolioAssets, Transaction],
+      models: [User, RefreshToken, ResetToken, Role, UserRoles, Asset, Portfolio, PortfolioAssets, Transaction, CryptoAssetData, CryptoChartsData],
       autoLoadModels: true,
       synchronize: true, // включи это временно
       sync: { alter: true }

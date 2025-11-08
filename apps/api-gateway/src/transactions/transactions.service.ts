@@ -3,8 +3,8 @@ import { ClientProxy } from '@nestjs/microservices';
 import { firstValueFrom } from 'rxjs';
 
 import { APP_CLIENT } from "./constant";
-import { TRANSACTIONS_PATTERNS } from '@app/contracts/transactions/transactions.pattern';
-import { sendOrThrow } from '@app/contracts/common/rpc/client';
+import { TRANSACTIONS_PATTERNS } from '@libs/contracts/transactions/transactions.pattern';
+import { sendOrThrow } from '@libs/contracts/common/rpc/client';
 
 @Injectable()
 export class TransactionsService {

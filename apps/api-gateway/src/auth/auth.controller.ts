@@ -9,7 +9,7 @@ import {
   ChangePasswordDto,
   ForgotPasswordDto,
   ResetPasswordDto,
-} from '@app/contracts';
+} from '@libs/contracts';
 
 import { setAuthCookies, clearAuthCookies, REFRESH_TOKEN_COOKIE } from "./cookie.const";
 

@@ -2,15 +2,15 @@ import { Inject, Injectable } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 
 import { APP_CLIENT } from './constant';
-import { ASSETS_PATTERNS } from '@app/contracts/assets/assets.pattern';
+import { ASSETS_PATTERNS } from '@libs/contracts/assets/assets.pattern';
 
 import {
   CreateAssetDto,
   AddAssetToPortfolioDto,
   SellAssetDto,
   RemoveAssetFromPortfolioDto,
-} from '@app/contracts';
-import { sendOrThrow } from '@app/contracts/common/rpc/client';
+} from '@libs/contracts';
+import { sendOrThrow } from '@libs/contracts/common/rpc/client';
 
 @Injectable ()
 export class AssetsService {
