@@ -44,6 +44,8 @@ export class CryptoDataScrapperService {
       await this.collectAllAssets();
     } catch (e) {
       this.log.error(`Cron collect failed: ${e instanceof Error ? e.message : e}`);
+    } finally {
+      this.isRunning = false;
     }
   }
 
