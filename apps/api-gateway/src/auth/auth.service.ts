@@ -31,6 +31,10 @@ export class AuthService {
     return sendOrThrow(this.appMs, AUTH_PATTERNS.REFRESH, refreshToken);
   }
 
+  me(accessToken: string) {
+    return sendOrThrow(this.appMs, AUTH_PATTERNS.ME, accessToken);
+  }
+
   logout(refreshToken: string | null) {
     return sendOrThrow(this.appMs, AUTH_PATTERNS.LOGOUT, refreshToken);
   }

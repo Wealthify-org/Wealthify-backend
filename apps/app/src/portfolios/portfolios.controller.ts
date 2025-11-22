@@ -23,6 +23,11 @@ export class PortfoliosController {
     return this.portfolioService.getPortfolioByName(payload.name)
   }
 
+  @MessagePattern(PORTFOLIOS_PATTERNS.USER_SUMMARY) 
+  getUserSummary(@Payload() payload: { userId: number }) {
+    return this.portfolioService.getUserSummary(payload.userId);
+  }
+
   @MessagePattern(PORTFOLIOS_PATTERNS.DELETE_BY_ID)
   delete(@Payload() payload: {id: number}) {
     return this.portfolioService.deletePortfolio(payload.id)

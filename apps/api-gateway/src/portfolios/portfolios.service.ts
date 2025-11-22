@@ -22,6 +22,10 @@ export class PortfoliosService {
     return sendOrThrow(this.appMs, PORTFOLIOS_PATTERNS.FIND_BY_NAME, { name });
   }
 
+  getUserSummary(userId: number) {
+    return sendOrThrow(this.appMs, PORTFOLIOS_PATTERNS.USER_SUMMARY, { userId });
+  }
+
   deletePortfolio(id: number) {
     return sendOrThrow(this.appMs, PORTFOLIOS_PATTERNS.DELETE_BY_ID, { id });
   }
