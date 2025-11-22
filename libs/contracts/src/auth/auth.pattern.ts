@@ -6,4 +6,5 @@ export const AUTH_PATTERNS = {
   CHANGE_PASSWORD: "auth.changePassword",
   FORGOT_PASSWORD: "auth.forgotPassword",
   RESET_PASSWORD: "auth.resetPassword",
+  ME: "auth.me",
 };

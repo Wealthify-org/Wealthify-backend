@@ -5,6 +5,8 @@ import { PortfoliosService } from './portfolios.service';
 import { CreatePortfolioDto } from '@libs/contracts';
 
 import { JwtAuthGuard } from '@gateway/common/guards/jwt-auth.guard';
+import { CurrentUser } from '@gateway/common/decorators/сurrent-user.decorator';
+import { UserPortfoliosSummaryDto } from '@libs/contracts/portfolios/dto/user-portfolios-summary.dto';
 
 @ApiTags('Портфели')
 @Controller('portfolios')
@@ -37,6 +39,18 @@ export class PortfoliosController {
   @ApiResponse({ status: 200, description: 'Портфель найден или сообщение об отсутствии' })
   getByName(@Param('name') name: string) {
     return this.portfolios.getPortfolioByName(name);
+  }
+
+  @Get('/summary/me')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({summary: "Сводка по всем портфелям текущего пользователя"})
+  @ApiResponse({
+    status: 200,
+    description: "Баланс и изменение за 24ч USD",
+    type: Object,
+  })
+  getMySummary(@CurrentUser("id") userId: number): Promise<UserPortfoliosSummaryDto> {
+    return this.portfolios.getUserSummary(userId);
   }
 
   @Delete(':id')

@@ -32,6 +32,11 @@ export class AuthController {
     return this.authService.refreshTokens(refreshToken);
   }
 
+  @MessagePattern(AUTH_PATTERNS.ME)
+  async me(@Payload() accessToken: string) {
+    return this.authService.authMe(accessToken);
+  }
+
   @MessagePattern(AUTH_PATTERNS.LOGOUT)
   async logout(@Payload() refreshToken: string | null) {
     if (refreshToken) {

@@ -1,4 +1,4 @@
-import { Model, Column, DataType, ForeignKey, Table } from "sequelize-typescript";
+import { Model, Column, DataType, ForeignKey, Table, BelongsTo } from "sequelize-typescript";
 import { Asset } from "./assets.model";
 import { Portfolio } from "@app/portfolios/portfolios.model";
 import { ApiProperty } from "@nestjs/swagger";
@@ -29,6 +29,12 @@ export class PortfolioAssets extends Model<PortfolioAssets, PortfolioAssetCreati
   @ApiProperty({ example: 10.5, description: 'Количество единиц актива, находящихся в портфеле' })
   @Column({type: DataType.DOUBLE})
   declare quantity: number
+
+  @BelongsTo(() => Asset)
+  declare asset: Asset;
+
+  @BelongsTo(() => Portfolio)
+  declare portfolio: Portfolio;
 
   @ApiProperty({ example: 1250.75, description: 'Средняя цена покупки одной единицы актива (в USD)' })
   @Column({type: DataType.DOUBLE})

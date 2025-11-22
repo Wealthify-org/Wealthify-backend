@@ -1,5 +1,5 @@
-import { Body, Controller, HttpStatus, Post, Put, Req, Res, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Get, Headers, HttpStatus, Post, Put, Req, Res, UnauthorizedException, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
 import { Response, Request } from 'express';
 
 import { AuthService } from './auth.service';
@@ -53,6 +53,25 @@ export class AuthController {
     res.setHeader('Authorization', `Bearer ${accessToken}`)
 
     return { user };
+  }
+
+  @Get("me")
+  @ApiOperation({ summary: 'Получить данные текущего пользователя по access token' })
+  @ApiBearerAuth('access-token')
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Успешное получение данных пользователя',
+    type: Object,
+  })
+  @ApiUnauthorizedResponse({
+    description: 'Нет access токена или он передан не в формате Bearer',
+  })
+  async me(@Headers('Authorization') authHeader?: string) {
+    if (!authHeader?.startsWith("Bearer ")) {
+      throw new UnauthorizedException("No access token");
+    }
+    const accessToken = authHeader.slice('Bearer '.length).trim();
+    return this.auth.me(accessToken);
   }
 
   @ApiOperation({ summary: 'Выход (инвалидация refresh + очистка cookie)' })

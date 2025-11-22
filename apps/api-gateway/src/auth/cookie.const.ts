@@ -13,11 +13,11 @@ export const setAuthCookies = (
     httpOnly: true, 
     secure: isProd,
     sameSite: 'lax',
-    path: '/auth',
+    path: '/',
     maxAge: 3 * 24 * 60 * 60 * 1000,
   })
 }
 
 export const clearAuthCookies = (res: Response) => {
-  res.clearCookie(REFRESH_TOKEN_COOKIE, {path: '/auth'})
+  res.clearCookie(REFRESH_TOKEN_COOKIE, {path: '/'})
 }

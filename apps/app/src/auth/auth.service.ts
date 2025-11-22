@@ -44,7 +44,6 @@ export class AuthService {
     const hashPassword = await bcrypt.hash(userDto.password, this.hashComplexity)
     const user = await this.userService.createUser({...userDto, password: hashPassword})
     const tokens = await this.generateUserTokens(user)
-    console.log('USER', user.dataValues)
     return { ...tokens, user: this.safeUser(user)}
   }
 
@@ -53,7 +52,9 @@ export class AuthService {
     if (!user) {
       rpcError(HttpStatus.UNAUTHORIZED, "BAD_CREDENTIALS", 'Incorrect email or password');
     }
+
     const tokens = await this.generateUserTokens(user)
+    
     return { ...tokens, user: this.safeUser(user)}
   }
 
@@ -89,6 +90,29 @@ export class AuthService {
 
     const tokens = await this.generateUserTokens(user)
     return { ...tokens, user: this.safeUser(user) }
+  }
+
+  async authMe(accessToken?: string) {
+    if (!accessToken) {
+      rpcError(HttpStatus.UNAUTHORIZED, "NO_ACCESS_TOKEN", "No access token");
+    }
+
+    try {
+      const payload = this.jwtService.verify<UserPayload>(accessToken);
+
+      const user = await this.userService.getUserById(payload.id);
+      if (!user) {
+        rpcError(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "User not found");
+      }
+
+      return this.safeUser(user);
+    } catch (err) {
+      rpcError(
+        HttpStatus.UNAUTHORIZED,
+        'INVALID_ACCESS_TOKEN',
+        `Access token is invalid or expired - ${err}`,
+      )
+    }
   }
 
   async revokeRefreshToken(refreshTokenPlain: string) {
@@ -183,7 +207,10 @@ export class AuthService {
       email: user.dataValues.email,
       roles: user.dataValues.roles
     }
-    const accessToken = this.jwtService.sign( payload, { expiresIn: '15m' })
+
+
+    const accessToken = this.jwtService.sign(payload);
+
     const refreshToken = uuidv4()
 
     const hashedRefreshToken = await bcrypt.hash(refreshToken, this.hashComplexity)
@@ -222,7 +249,6 @@ export class AuthService {
 
   private safeUser(user: User) {
     const raw = (user as any).toJSON?.() ?? (user as any).dataValues ?? user
-    console.log("ROOOW", raw);
     const { password, ...rest } = raw
     return rest
   }
