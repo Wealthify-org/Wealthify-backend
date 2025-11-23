@@ -21,7 +21,7 @@ import { ASSETS_CLIENT } from "../portfolios/portfolio.constants";
         transport: Transport.RMQ,
         options: {
           urls: [process.env.RABBITMQ_URL ?? "amqp://guest:guest@localhost:5672"],
-          queue: process.env.APP_QUEUE ?? "app_rpc", // очередь микросервиса с активами
+          queue: process.env.ASSETS_QUEUE ?? "assets_rpc", // очередь микросервиса с активами
           queueOptions: { durable: true },
         },
       },

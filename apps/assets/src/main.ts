@@ -1,10 +1,10 @@
 import { NestFactory } from '@nestjs/core'
-import { AppModule } from './app.module'
+import { AssetsMainModule } from './assets-main.module'
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 
 async function start() {
   const app = await NestFactory.createMicroservice<MicroserviceOptions>(
-    AppModule,
+    AssetsMainModule,
     {
       transport: Transport.RMQ,
       options: {

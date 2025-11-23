@@ -1,6 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
-import { firstValueFrom } from 'rxjs';
 
 import { PORTFOLIO_CLIENT } from "./constant";
 import { TRANSACTIONS_PATTERNS } from '@libs/contracts/transactions/transactions.pattern';

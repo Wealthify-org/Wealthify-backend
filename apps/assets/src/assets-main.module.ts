@@ -6,16 +6,11 @@ import { Asset } from "./assets/assets.model";
 import { CryptoAssetData } from "@libs/crypto-data/models";
 import { CryptoChartsData } from "@libs/crypto-data/models";
 
-const fish = (): string => {
-  console.log("BITCH", `.${process.env.NODE_ENV}.env`);
-  return `.${process.env.NODE_ENV}.env`
-}
-
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: fish()
+      envFilePath: `.${process.env.NODE_ENV}.env`
     }),
     SequelizeModule.forRoot({
       dialect: 'postgres',
@@ -32,6 +27,6 @@ const fish = (): string => {
     AssetsModule,
   ]
 })
-export class AppModule {
+export class AssetsMainModule {
 
 }
