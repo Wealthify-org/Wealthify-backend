@@ -19,5 +19,12 @@ export const CreatePortfolioSchema = z
       .describe('ID пользователя, которому принадлежит портфель'),
   })
   .strict();
+  
+export const CreatePortfolioWithoutUserSchema = CreatePortfolioSchema.omit({
+  userId: true,
+});
 
+export class CreatePortfolioWithoutUserDto extends createZodDto(
+  CreatePortfolioWithoutUserSchema,
+) {}
 export class CreatePortfolioDto extends createZodDto(CreatePortfolioSchema) {}

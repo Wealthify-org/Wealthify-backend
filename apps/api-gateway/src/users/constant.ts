@@ -1,1 +1,1 @@
-export const APP_CLIENT = 'APP_CLIENT';
+export const IDENTITY_CLIENT = 'IDENTITY_CLIENT';

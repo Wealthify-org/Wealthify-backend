@@ -19,13 +19,13 @@
         "tsConfigPath": "apps/api-gateway/tsconfig.app.json"
       }
     },
-    "app": {
+    "assets": {
       "type": "application",
-      "root": "apps/app",
+      "root": "apps/assets",
       "entryFile": "main",
-      "sourceRoot": "apps/app/src",
+      "sourceRoot": "apps/assets/src",
       "compilerOptions": {
-        "tsConfigPath": "apps/app/tsconfig.app.json"
+        "tsConfigPath": "apps/assets/tsconfig.app.json"
       }
     },
     "crypto-data-worker": {
@@ -35,6 +35,24 @@
       "sourceRoot": "apps/crypto-data-worker/src",
       "compilerOptions": {
         "tsConfigPath": "apps/crypto-data-worker/tsconfig.app.json"
+      }
+    },
+    "identity": {
+      "type": "application",
+      "root": "apps/identity",
+      "entryFile": "main",
+      "sourceRoot": "apps/identity/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/identity/tsconfig.app.json"
+      }
+    },
+    "portfolio-core": {
+      "type": "application",
+      "root": "apps/portfolio-core",
+      "entryFile": "main",
+      "sourceRoot": "apps/portfolio-core/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/portfolio-core/tsconfig.app.json"
       }
     }
   }

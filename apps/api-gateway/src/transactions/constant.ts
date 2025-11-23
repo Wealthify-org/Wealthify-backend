@@ -1,1 +1,1 @@
-export const APP_CLIENT = 'APP_CLIENT';
+export const PORTFOLIO_CLIENT = 'PORTFOLIO_CLIENT';

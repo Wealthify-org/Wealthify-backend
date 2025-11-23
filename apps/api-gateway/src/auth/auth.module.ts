@@ -8,7 +8,7 @@ import { ClientConfigService } from "../client-config/client-config.service";
 
 import { AuthController } from "./auth.controller";
 import { AuthService } from "./auth.service";
-import { APP_CLIENT } from "./constant";
+import { IDENTITY_CLIENT } from "./constant";
 import { GatewayAuthModule } from "./gateway-auth.module";
 
 @Module({
@@ -30,9 +30,9 @@ import { GatewayAuthModule } from "./gateway-auth.module";
   providers: [
     AuthService,
     {
-      provide: APP_CLIENT,
+      provide: IDENTITY_CLIENT,
       useFactory: (cfg: ClientConfigService) =>
-        ClientProxyFactory.create(cfg.appClientOptions),
+        ClientProxyFactory.create(cfg.identityClientOptions),
       inject: [ClientConfigService],
     },
   ],

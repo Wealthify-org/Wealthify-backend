@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/c
 import { ApiBody, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 import { PortfoliosService } from './portfolios.service';
-import { CreatePortfolioDto } from '@libs/contracts';
+import { CreatePortfolioDto, CreatePortfolioWithoutUserDto } from '@libs/contracts';
 
 import { JwtAuthGuard } from '@gateway/common/guards/jwt-auth.guard';
 import { CurrentUser } from '@gateway/common/decorators/сurrent-user.decorator';
@@ -19,17 +19,25 @@ export class PortfoliosController {
   @ApiBody({ type: CreatePortfolioDto })
   @ApiResponse({ status: 201, description: 'Портфель успешно создан' })
   @ApiResponse({ status: 400, description: 'Ошибка валидации входных данных' })
-  create(@Body() dto: CreatePortfolioDto) {
-    return this.portfolios.createPortfolio(dto);
+  create(
+    @Body() dto: CreatePortfolioWithoutUserDto, 
+    @CurrentUser('id') userId: number,) 
+  {
+      const payload: CreatePortfolioDto = {
+      ...(dto as any),
+      userId,
+    };
+
+    return this.portfolios.createPortfolio(payload);
   }
 
-  @Get('/user/:id')
+  @Get('/user')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Получить все портфели пользователя по его ID' })
   @ApiParam({ name: 'id', example: 1, description: 'ID пользователя' })
   @ApiResponse({ status: 200, description: 'Список портфелей' })
-  getAll(@Param('id') id: string) {
-    return this.portfolios.getAllPortfolios(Number(id));
+  getAll(@CurrentUser("id") userId: number) {
+    return this.portfolios.getAllPortfolios(userId);
   }
 
   @Get('/name/:name')

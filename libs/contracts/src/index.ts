@@ -1,7 +1,7 @@
-export * from "./assets/dto/add-asset-to-portfolio.dto";
+export * from "./portfolio-assets/dto/add-asset-to-portfolio.dto";
 export * from "./assets/dto/create-asset.dto";
-export * from "./assets/dto/remove-asset-from-portfolio.dto";
-export * from "./assets/dto/sell-asset.dto";
+export * from "./portfolio-assets/dto/remove-asset-from-portfolio.dto";
+export * from "./portfolio-assets/dto/sell-asset.dto";
 export * from "./common/enums/asset-type.enum"
 
 export * from "./auth/dto/change-password.dto";

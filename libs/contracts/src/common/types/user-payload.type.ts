@@ -1,4 +1,4 @@
-import { Role } from "@app/roles/roles.model";
+import { Role } from "@identity/roles/roles.model";
 
 export class UserPayload {
   readonly id: number;

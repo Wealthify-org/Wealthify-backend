@@ -1,8 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
-import { firstValueFrom } from 'rxjs';
 
-import { APP_CLIENT } from './constant';
+import { IDENTITY_CLIENT } from './constant';
 import { AUTH_PATTERNS } from '@libs/contracts/auth/auth.pattern';
 
 import {
@@ -17,7 +16,7 @@ import { sendOrThrow } from '@libs/contracts/common/rpc/client';
 
 @Injectable()
 export class AuthService {
-  constructor(@Inject(APP_CLIENT) private readonly appMs: ClientProxy) {}
+  constructor(@Inject(IDENTITY_CLIENT) private readonly appMs: ClientProxy) {}
 
   login(dto: LoginDto) {
     return sendOrThrow(this.appMs, AUTH_PATTERNS.LOGIN, dto);

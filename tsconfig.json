@@ -18,12 +18,24 @@
     "strictBindCallApply": false,
     "noFallthroughCasesInSwitch": false,
     "paths": {
+      "@assets/*": [
+        "apps/assets/src/*"
+      ],
+      "@crypto-worker/*": [
+        "apps/crypto-data-worker/src/*"
+      ],
+      "@gateway/*": [
+        "apps/api-gateway/src/*"
+      ],
+      "@identity/*": [
+        "apps/identity/src/*"
+      ],
+      "@portfolio-core/*": [
+        "apps/portfolio-core/src/*"
+      ],
       "@libs/contracts": [
         "libs/contracts/src"
       ],
-      "@app/*": ["apps/app/src/*"],
-      "@gateway/*": ["apps/api-gateway/src/*"],
-      "@crypto-worker/*": ["apps/crypto-data-worker/src/*"],
       "@libs/contracts/*": [
         "libs/contracts/src/*"
       ],
