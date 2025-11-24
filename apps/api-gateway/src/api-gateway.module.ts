@@ -9,6 +9,7 @@ import { RolesModule } from '@gateway/roles/roles.module';
 import { TransactionsModule } from '@gateway/transactions/transactions.module';
 import { UsersModule } from '@gateway/users/users.module';
 import { CryptoDataWorkerModule } from './crypto-data-worker/crypto-data-worker.module';
+import { PortfolioAssetsModule } from './portfolio-assets/portfolio-assets.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { CryptoDataWorkerModule } from './crypto-data-worker/crypto-data-worker.
     TransactionsModule,
     UsersModule,
     CryptoDataWorkerModule,
+    PortfolioAssetsModule
   ],
   controllers: [ApiGatewayController],
   providers: [ApiGatewayService],

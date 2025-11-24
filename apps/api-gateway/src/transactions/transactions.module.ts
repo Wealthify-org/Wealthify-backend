@@ -6,7 +6,7 @@ import { ClientConfigService } from '../client-config/client-config.service';
 
 import { TransactionsController } from './transactions.controller';
 import { TransactionsService } from './transactions.service';
-import { APP_CLIENT } from "./constant";
+import { PORTFOLIO_CLIENT } from "./constant";
 import { GatewayAuthModule } from '@gateway/auth/gateway-auth.module';
 
 @Module({
@@ -15,9 +15,9 @@ import { GatewayAuthModule } from '@gateway/auth/gateway-auth.module';
   providers: [
     TransactionsService,
     {
-      provide: APP_CLIENT,
+      provide: PORTFOLIO_CLIENT,
       useFactory: (cfg: ClientConfigService) =>
-        ClientProxyFactory.create(cfg.appClientOptions),
+        ClientProxyFactory.create(cfg.portfolioClientOptions),
       inject: [ClientConfigService],
     },
   ],

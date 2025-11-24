@@ -1,14 +1,14 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 
-import { APP_CLIENT } from "./constant";
+import { IDENTITY_CLIENT } from "./constant";
 import { ROLES_PATTERNS } from '@libs/contracts/roles/roles.pattern';
 import { CreateRoleDto } from '@libs/contracts';
 import { sendOrThrow } from '@libs/contracts/common/rpc/client';
 
 @Injectable()
 export class RolesService {
-  constructor(@Inject(APP_CLIENT) private readonly appMs: ClientProxy) {}
+  constructor(@Inject(IDENTITY_CLIENT) private readonly appMs: ClientProxy) {}
 
   createRole(dto: CreateRoleDto) {
     return sendOrThrow(this.appMs, ROLES_PATTERNS.CREATE, dto);

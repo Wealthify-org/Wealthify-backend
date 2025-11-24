@@ -6,10 +6,13 @@ async function start() {
   const app = await NestFactory.createMicroservice<MicroserviceOptions>(
     CryptoDataWorkerModule,
     {
-      transport: Transport.TCP,
+      transport: Transport.RMQ,
       options: {
-        host: '127.0.0.1',
-        port: 3002,
+        urls: [process.env.RABBITMQ_URL ?? 'amqp://localhost:5672'],
+        queue: process.env.WORKER_QUEUE ?? 'crypto_data_rpc',
+        queueOptions: {
+          durable: true,
+        },
       }
     }
   )

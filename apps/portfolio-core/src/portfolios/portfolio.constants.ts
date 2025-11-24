@@ -1,0 +1,1 @@
+export const ASSETS_CLIENT = "ASSETS_CLIENT";

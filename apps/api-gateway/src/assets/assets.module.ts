@@ -7,7 +7,7 @@ import { ClientConfigService } from '../client-config/client-config.service';
 import { AssetsController } from "./assets.controller";
 import { AssetsService } from "./assets.service";
 
-import { APP_CLIENT } from './constant';
+import { ASSETS_CLIENT } from './constant';
 import { GatewayAuthModule } from '@gateway/auth/gateway-auth.module';
 
 @Module({
@@ -16,9 +16,9 @@ import { GatewayAuthModule } from '@gateway/auth/gateway-auth.module';
   providers: [
     AssetsService,
     {
-      provide: APP_CLIENT,
+      provide: ASSETS_CLIENT,
       useFactory: (cfg: ClientConfigService) => 
-        ClientProxyFactory.create(cfg.appClientOptions),
+        ClientProxyFactory.create(cfg.assetsClientOptions),
       inject: [ClientConfigService],
     },
   ],
