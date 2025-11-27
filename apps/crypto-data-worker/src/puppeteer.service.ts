@@ -1,37 +1,60 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
-const puppeteer = require('puppeteer-extra'); // оставил CJS, как у тебя
+import puppeteerExtra from 'puppeteer-extra';
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 import type { Browser, Page } from 'puppeteer';
+import { ProxyConfig } from './proxies';
 
-puppeteer.use(StealthPlugin());
+puppeteerExtra.use(StealthPlugin());
 
+export { puppeteerExtra };
+// puppeteer.service.ts
 @Injectable()
 export class PuppeteerService implements OnModuleDestroy {
-  private browser: Browser | null = null;
+  private browsers = new Map<string, Browser>();
 
-  async getBrowser(): Promise<Browser> {
-    if (this.browser) {
-      return this.browser;
+  async getBrowser(proxy?: ProxyConfig): Promise<Browser> {
+    const key = proxy ? `${proxy.host}:${proxy.port}` : 'direct';
+
+    const cached = this.browsers.get(key);
+    if (cached) return cached;
+
+    const args = [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+    ];
+
+    if (proxy) {
+      args.push(`--proxy-server=http://${proxy.host}:${proxy.port}`);
     }
-    const created = await puppeteer.launch({
+
+    const browser = await puppeteerExtra.launch({
       headless: true,
       defaultViewport: { width: 1920, height: 1080 },
+      args,
     });
 
-    this.browser = created;
-    return created;
+    this.browsers.set(key, browser);
+    return browser;
   }
 
-  async newPage(): Promise<Page> {
-    const browser = await this.getBrowser();
+  async newPage(proxy?: ProxyConfig): Promise<Page> {
+    const browser = await this.getBrowser(proxy);
     const page = await browser.newPage();
+
+    if (proxy?.username && proxy?.password) {
+      await page.authenticate({
+        username: proxy.username,
+        password: proxy.password,
+      });
+    }
+
     return page;
   }
-  
+
   async onModuleDestroy(): Promise<void> {
-    if (this.browser) {
-      await this.browser.close().catch(() => {});
-      this.browser = null;
-    }
+    await Promise.all(
+      Array.from(this.browsers.values()).map((b) => b.close().catch(() => {})),
+    );
+    this.browsers.clear();
   }
 }

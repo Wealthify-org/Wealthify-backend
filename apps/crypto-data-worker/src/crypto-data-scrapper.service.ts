@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PuppeteerService } from './puppeteer.service';
-import { Cron } from '@nestjs/schedule';
+import { Cron, CronExpression } from '@nestjs/schedule';
 
 import {
   RangeToButton,
@@ -17,22 +17,46 @@ import type {
   Sparkline7D,
   SeriesPoint,
 } from '@libs/contracts/crypto-data-worker';
-import { HTTPResponse, Page } from 'puppeteer';
+import { Browser, HTTPResponse, Page } from 'puppeteer';
 import { CryptoDataWorkerService } from './crypto-data-worker.service';
+
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { loadProxiesFromEnv, ProxyConfig } from './proxies';
+
+
+const DEBUG_SCREENSHOTS_DIR = path.resolve(process.cwd(), 'debug-screenshots');
+
+function splitIntoChunks<T>(items: T[], chunksCount: number): T[][] {
+  const result: T[][] = [];
+  const chunkSize = Math.ceil(items.length / chunksCount);
+
+  for (let i = 0; i < chunksCount; i++) {
+    const start = i * chunkSize;
+    const end = start + chunkSize;
+    result.push(items.slice(start, end));
+  }
+
+  return result;
+}
 
 @Injectable()
 export class CryptoDataScrapperService {
   private readonly log = new Logger('CryptoDataWorker');
   private readonly baseUrl = 'https://www.coingecko.com/en/all-cryptocurrencies';
-  
+  private readonly proxies: ProxyConfig[];
+  private readonly checkedIfconfigProxies = new Set<string>();
+
   private isRunning = false;
 
   constructor(
     private readonly pp: PuppeteerService,
     private readonly cryproDataWorkerService: CryptoDataWorkerService,
-  ) {}
+  ) {
+    this.proxies = loadProxiesFromEnv();
+  }
 
-  @Cron('*/1 * * * *') // каждые 5 минут
+  @Cron(CronExpression.EVERY_10_SECONDS) // каждые 5 минут
   async collectAllAssetsDataCron() {
     if (this.isRunning) {
       this.log.warn('Previous collectAllAssets run is still in progress, skipping this tick');
@@ -51,7 +75,7 @@ export class CryptoDataScrapperService {
 
   private async collectAllAssets() {
     this.log.log('Collecting TOP-200 from CoinGecko...');
-    const page = await this.pp.newPage();
+    const page = await this.pp.newPage(this.proxies[0]);
 
     try {
       await this.openAllCryptosPage(page, this.baseUrl);
@@ -71,27 +95,87 @@ export class CryptoDataScrapperService {
       this.log.log(`Collected ${links.length} links (need first 200).`);
 
       const top = links.slice(0, 200);
-      for (let i = 0; i < top.length; i++) {
-        const href = top[i];
-        this.log.debug(`[${i + 1}/${top.length}] Parsing: ${href}`);
+
+      // СРАВНЕНИЕ СКОРОСТИ
+      // await this.benchmarkTenAssets(top);
+      this.log.log(`Start parsing ${top.length} assets with plain Puppeteer browsers...`);
+
+      const chunks = splitIntoChunks(top, this.proxies.length);
+
+      await Promise.all(
+        this.proxies.map((proxy, idx) => {
+          const chunk = chunks[idx] ?? [];
+          if (!chunk.length) {
+            this.log.warn(`No links assigned for proxy ${proxy.host}:${proxy.port}`);
+            return Promise.resolve();
+          }
+          return this.parseCoinsWithProxyBrowser(proxy, chunk);
+        }),
+      );
+    } finally {
+      await this.pp.onModuleDestroy();
+    }
+  }
+
+  private async parseCoinsWithProxyBrowser(
+    proxy: ProxyConfig,
+    links: string[],
+  ): Promise<void> {
+    const { host, port } = proxy;
+    const proxyLabel = `${host}:${port}`;
+
+    if (!links.length) {
+      this.log.warn(
+        `No links to parse for proxy ${host}:${port} – skipping browser run`,
+      );
+      return;
+    }
+
+    this.log.log(
+      `Started browser for proxy ${host}:${port}, ${links.length} links assigned`,
+    );
+
+    const page = await this.pp.newPage(proxy);
+    const proxyStart = performance.now();
+    const isChecked = await this.checkProxyViaIfconfig(page, proxy);
+    // if (!isChecked) {
+    //   this.log.error("IP IS NOT CHECKED");
+    //   return;
+    // }
+
+    try {
+      for (let i = 0; i < links.length; i++) {
+        const href = links[i];
+        this.log.debug(
+          `[proxy ${host}:${port}] [${i + 1}/${links.length}] Parsing: ${href}`,
+        );
 
         try {
-          const data = await this.parseCoin(page, href);
-          await this.cryproDataWorkerService.upsertFromCryptoData(data);
+          const cryptoData = await this.parseCoin(page, href);
+          await this.cryproDataWorkerService.upsertFromCryptoData(cryptoData);
 
           this.log.debug(
-            `PARSED DATA for ${data.assetTicker} (rank=${data.currentAssetRank}) - ${href}`,
+            `[proxy ${host}:${port}] [${i + 1}/${links.length}] PARSED DATA for ${cryptoData.assetTicker} (rank=${cryptoData.currentAssetRank}) - ${href}`,
           );
         } catch (err) {
           this.log.warn(
-            `Failed to parse ${href}: ${err instanceof Error ? err.message : err}`,
+            `[proxy ${host}:${port}] [${i + 1}/${links.length}] Failed to parse ${href}: ${
+              err instanceof Error ? err.message : err
+            }`,
           );
         }
-        // чуть притормаживаем, чтобы не кидать запросы слишком часто
+
         await this.sleep(200);
       }
     } finally {
-      await this.pp.onModuleDestroy();
+      const proxyEnd = performance.now();
+      this.log.warn(
+        `[BENCH][proxy ${proxyLabel}] finished in ${(
+          (proxyEnd - proxyStart) /
+          1000
+        ).toFixed(2)}s`,
+      );
+      this.log.log(`PARSED ALL ASSETS`)
     }
   }
 
@@ -333,6 +417,149 @@ export class CryptoDataScrapperService {
   private sleep(ms: number): Promise<void> {
     return new Promise<void>((resolve) => setTimeout(resolve, ms));
   }
+
+  private async checkProxyViaIfconfig(page: Page, proxy: ProxyConfig): Promise<boolean> {
+    const { host, port } = proxy;
+    const url = 'https://ifconfig.me/ip';
+
+    try {
+      this.log.warn(`[ifconfig.me] Checking proxy ${host}:${port}...`);
+
+      await page.goto(url, {
+        waitUntil: 'domcontentloaded',
+        timeout: 15_000,
+      });
+
+      // скриншот того, что реально отрисовано в браузере
+      await this.safeDebugScreenshot(page, url, `ifconfig_${host}_${port}`);
+
+      const ipText = await page.evaluate(() => {
+        return (document.body?.innerText || '').trim();
+      });
+
+      this.log.warn(
+        `[ifconfig.me] Proxy ${host}:${port} sees IP: "${ipText}"`,
+      );
+      return true;
+    } catch (e) {
+      this.log.warn(
+        `[ifconfig.me] Failed to check proxy ${host}:${port}: ${
+          e instanceof Error ? e.message : e
+        }`,
+      );
+
+      return false;
+    }
+  }
+
+  private async benchmarkTenAssets(allLinks: string[]): Promise<void> {
+    // Берём ровно 10 активов
+    const sample = allLinks.slice(0, 5);
+    if (sample.length < 10) {
+      this.log.warn(`BENCH: not enough links, have only ${sample.length}`);
+    }
+
+    this.log.warn(`BENCH: using ${sample.length} links for benchmark`);
+
+    //
+    // 1) ОДИН ПАРСЕР (1 прокси, все 10 последовательно)
+    //
+    const singleStart = performance.now();
+    await this.parseCoinsWithProxyBrowser(this.proxies[0], sample);
+    const singleEnd = performance.now();
+
+    const singleMs = singleEnd - singleStart;
+    const singleSec = singleMs / 1000;
+
+    this.log.warn(
+      `BENCH: Single parser (1 proxy) parsed ${sample.length} assets in ${singleSec.toFixed(
+        2,
+      )}s`,
+    );
+
+    //
+    // 2) ПЯТЬ ПАРСЕРОВ ПАРАЛЛЕЛЬНО (5 прокси, всё те же 10, поделённые на чанки)
+    //
+    const chunks = splitIntoChunks(sample, this.proxies.length);
+    this.log.warn(
+      `BENCH: Parallel run — ${this.proxies.length} parsers, chunks: ${chunks
+        .map((c) => c.length)
+        .join(', ')}`,
+    );
+
+    const parallelStart = performance.now();
+
+    await Promise.all(
+      this.proxies.map((proxy, idx) => {
+        const chunk = chunks[idx] ?? [];
+        if (!chunk.length) {
+          this.log.warn(
+            `BENCH: No links assigned for proxy ${proxy.host}:${proxy.port} in parallel test`,
+          );
+          return Promise.resolve();
+        }
+        return this.parseCoinsWithProxyBrowser(proxy, chunk);
+      }),
+    );
+
+    const parallelEnd = performance.now();
+
+    const parallelMs = parallelEnd - parallelStart;
+    const parallelSec = parallelMs / 1000;
+
+    this.log.warn(
+      `BENCH: 5 parallel parsers parsed ${sample.length} assets in ${parallelSec.toFixed(
+        2,
+      )}s`,
+    );
+
+    if (parallelMs > 0) {
+      const speedup = singleMs / parallelMs;
+      this.log.warn(
+        `BENCH: Speedup = x${speedup.toFixed(
+          2,
+        )} (parallel 5 parsers vs single parser)`,
+      );
+    }
+  }
+
+  private async safeDebugScreenshot(
+    page: Page,
+    href: string,
+    context: string,
+  ): Promise<void> {
+    try {
+      if (page.isClosed()) {
+        this.log.warn(
+          `Cannot take screenshot for ${href}: page is already closed`,
+        );
+        return;
+      }
+
+      await fs.promises.mkdir(DEBUG_SCREENSHOTS_DIR, { recursive: true });
+
+      const ts = new Date().toISOString().replace(/[:.]/g, '-');
+      const safeHref = href.replace(/[^a-z0-9_-]/gi, '_').slice(0, 80);
+      const filename = `${context}_${safeHref}_${ts}.png`;
+
+      const fullPath = path.join(DEBUG_SCREENSHOTS_DIR, filename);
+
+      await page.screenshot({
+        path: fullPath as `${string}.png`,
+        fullPage: true,
+      });
+
+      this.log.warn(`Saved debug screenshot for ${href} to ${fullPath}`);
+    } catch (e) {
+      this.log.error(
+        `Failed to save screenshot for ${href}: ${
+          e instanceof Error ? e.message : e
+        }`,
+      );
+    }
+  }
+
+
 
   private isSuccessJson(res: HTTPResponse): boolean {
     const status = res.status();

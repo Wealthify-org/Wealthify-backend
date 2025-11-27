@@ -1,17 +1,18 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { CryptoDataWorkerController } from './crypto-data-worker.controller';
 import { CryptoDataScrapperService } from './crypto-data-scrapper.service';
 import { ScheduleModule } from '@nestjs/schedule';
 import { SequelizeModule } from '@nestjs/sequelize';
 import { CryptoAssetData, CryptoCandle, CryptoChartsData } from "@libs/crypto-data/models";
 import { PuppeteerService } from './puppeteer.service';
-import { ConfigModule } from '@nestjs/config';
 import { Asset } from "@libs/crypto-data/models";
 import { CryptoDataWorkerService } from './crypto-data-worker.service';
+import { CryptoDataFetcherService } from './crypto-data-fetcher.service';
 
 @Module({
   controllers: [CryptoDataWorkerController],
-  providers: [CryptoDataScrapperService, PuppeteerService, CryptoDataWorkerService],
+  providers: [CryptoDataScrapperService, PuppeteerService, CryptoDataWorkerService, CryptoDataFetcherService],
   imports: [
     ScheduleModule.forRoot(),
     ConfigModule.forRoot({
