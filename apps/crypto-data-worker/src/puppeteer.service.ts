@@ -7,10 +7,14 @@ import { ProxyConfig } from './proxies';
 puppeteerExtra.use(StealthPlugin());
 
 export { puppeteerExtra };
-// puppeteer.service.ts
+
 @Injectable()
 export class PuppeteerService implements OnModuleDestroy {
   private browsers = new Map<string, Browser>();
+
+  private getKey(proxy?: ProxyConfig): string {
+    return proxy ? `${proxy.host}:${proxy.port}` : 'direct';
+  }
 
   async getBrowser(proxy?: ProxyConfig): Promise<Browser> {
     const key = proxy ? `${proxy.host}:${proxy.port}` : 'direct';
@@ -49,6 +53,29 @@ export class PuppeteerService implements OnModuleDestroy {
     }
 
     return page;
+  }
+
+  async closeBrowser(proxy?: ProxyConfig): Promise<void> {
+    const key = this.getKey(proxy);
+    const browser = this.browsers.get(key);
+    if (!browser) return;
+
+    try {
+      await browser.close();
+    } catch {
+      // ignore
+    } finally {
+      this.browsers.delete(key);
+    }
+  }
+
+  async closeAll(): Promise<void> {
+    await Promise.all(
+      Array.from(this.browsers.values()).map((b) =>
+        b.close().catch(() => {}),
+      ),
+    );
+    this.browsers.clear();
   }
 
   async onModuleDestroy(): Promise<void> {

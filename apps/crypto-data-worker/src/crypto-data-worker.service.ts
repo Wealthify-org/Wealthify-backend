@@ -85,8 +85,6 @@ export class CryptoDataWorkerService {
     return assetData.charts ?? null;
   }
 
-  // ЗАПИСЬ ДАННЫХ
-
   async upsertFromCryptoData(payload: CryptoData) {
     const {
       assetName,

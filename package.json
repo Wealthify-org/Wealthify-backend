@@ -6,14 +6,19 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
-    "build": "nest build",
+    "build:workers": "tsc -p apps/crypto-data-worker/tsconfig.worker.json",
+    "build": "nest build && npm run build:workers",
     "start:gateway:dev": "cross-env NODE_ENV=development nest start api-gateway --watch",
     "start:assets:dev": "cross-env NODE_ENV=development nest start assets --watch",
     "start:worker:dev": "cross-env NODE_ENV=development nest start crypto-data-worker --watch",
     "start:identity:dev": "cross-env NODE_ENV=development nest start identity --watch",
     "start:portfolio-core:dev": "cross-env NODE_ENV=development nest start portfolio-core --watch",
-    "start:all:dev": "concurrently -k -n GATEWAY,ASSETS,WORKER,IDENTITY,PORTFOLIO -c auto \"npm run start:gateway:dev\" \"npm run start:assets:dev\" \"npm run start:worker:dev\" \"npm run start:identity:dev\" \"npm run start:portfolio-core:dev\"",
-    "dev": "npm run start:all:dev",
+
+    "dev:workers": "tsc -p apps/crypto-data-worker/tsconfig.worker.json --watch",
+
+    "start:all:dev": "concurrently -k -n GATEWAY,ASSETS,WORKER,IDENTITY,PORTFOLIO,WORKERS -c auto \"npm run start:gateway:dev\" \"npm run start:assets:dev\" \"npm run start:worker:dev\" \"npm run start:identity:dev\" \"npm run start:portfolio-core:dev\" \"npm run dev:workers\"",
+
+    "dev": "npm run build:workers && npm run start:all:dev",
     "start:gateway:prod": "node -r tsconfig-paths/register dist/apps/api-gateway/main.js",
     "start:assets:prod": "node -r tsconfig-paths/register dist/apps/assets/main.js",
     "start:worker:prod": "node -r tsconfig-paths/register dist/apps/crypto-data-worker/main.js",
