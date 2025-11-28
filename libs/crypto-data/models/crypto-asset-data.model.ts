@@ -12,7 +12,8 @@ export interface CryptoAssetCreationAttrs {
 
   description?: string;
   slug?: string;
-  logoUrl?: string;
+  logoUrl?: string | null;
+
   categories?: string;
   
   source?: string;
@@ -62,7 +63,15 @@ export class CryptoAssetData extends Model<CryptoAssetData, CryptoAssetCreationA
 
   @ApiProperty({ example: 'https://assets.coingecko.com/coins/images/1/large.png', required: false })
   @Column({ type: DataType.STRING(1024), allowNull: true })
-  declare logoUrl?: string;
+  declare logoUrl?: string | null;
+  
+  @ApiProperty({
+    example: '/static/logos/crypto/1.png',
+    required: false,
+    description: 'Локальный URL логотипа (через твой CDN/статику)',
+  })
+  @Column({ type: DataType.STRING(1024), allowNull: true })
+  declare logoUrlLocal: string | null;
 
   @ApiProperty({ example: 'Layer1;Store of Value', required: false })
   @Column({ type: DataType.TEXT, allowNull: true })

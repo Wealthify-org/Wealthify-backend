@@ -42,6 +42,8 @@ export type CryptoData = {
   assetDescription: string;
   assetCategories: string;
 
+  logoUrl?: string | null;
+
   sparkline7D?: Sparkline7D;
   charts?: CryptoCharts;
   candles?: CandlesByRange; 

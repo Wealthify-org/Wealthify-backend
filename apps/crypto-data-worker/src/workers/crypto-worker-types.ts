@@ -1,3 +1,10 @@
+import { ProxyConfig } from "@crypto-worker/proxies";
+
+export type WorkerInput = {
+  proxy: ProxyConfig
+  links: string[]; // здесь для бенча будет 1 ссылка на воркер
+};
+
 // базовые типы графиков 
 export type SeriesPoint = [number, number];
 
@@ -39,6 +46,8 @@ export type CryptoData = {
 
   assetDescription: string;
   assetCategories: string;
+
+  logoUrl?: string | null;
 
   sparkline7D?: Sparkline7D;
   charts?: CryptoCharts;

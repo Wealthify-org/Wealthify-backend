@@ -1,4 +1,3 @@
-import { ProxyConfig } from "../proxies";
 import { PuppeteerService } from "../puppeteer.service";
 import type {
   ChartPayload,
@@ -11,21 +10,11 @@ import type {
 } from "./crypto-worker-types";
 
 import { RangeToButton, RangeToDaysParam, RangeToPriceChartsFile } from "./crypto-worker-constants";
+import { NAVIGATION_TIMEOUT, SELECTOR_TIMEOUT, CATEGORY_SELECTOR_TIMEOUT, CHART_SELECTOR_TIMEOUT, CHART_RESPONSE_TIMEOUT } from "./crypto-worker-constants";
+import type { WorkerInput } from "./crypto-worker-types";
 
 const { parentPort } = require("worker_threads");
 import { HTTPResponse, Page } from "puppeteer";
-import { timeout } from "rxjs";
-
-const NAVIGATION_TIMEOUT = 60_000;        // сколько ждём загрузки страницы монеты
-const SELECTOR_TIMEOUT = 30_000;         // общий таймаут для селекторов
-const CATEGORY_SELECTOR_TIMEOUT = 30_000;// категории / about-блок
-const CHART_SELECTOR_TIMEOUT = 20_000;   // кнопки диапазонов графика
-const CHART_RESPONSE_TIMEOUT = 45_000;   // ответ API с графиком
-
-type WorkerInput = {
-  proxy: ProxyConfig
-  links: string[]; // здесь для бенча будет 1 ссылка на воркер
-};
 
 const puppeteerService = new PuppeteerService();
 
@@ -252,6 +241,23 @@ function extractCoinDataInPageContext(): ExtractedCoinFields | null {
     return cleaned ? parseFloat(cleaned) : 0;
   };
 
+  const getLogoUrl = (): string | null => {
+    // основной вариант – тот самый img из блока заголовка
+    const imgFromHeader = document.querySelector<HTMLImageElement>(
+      'div.tw-mb-2 img.tw-rounded-full.tw-h-6.tw-w-6',
+    );
+
+    const img =
+      imgFromHeader ||
+      // запасной вариант по alt (BTC logo, ETH logo и т.п.)
+      document.querySelector<HTMLImageElement>('img[alt$=" logo"]');
+
+    if (!img) return null;
+
+    const src = img.getAttribute('src') || img.src;
+    return src || null;
+  };
+
   const getTdByLabel = (exact: string): HTMLElement | null => {
     const rows = Array.from(document.querySelectorAll('table.tw-w-full tbody tr'));
     for (const r of rows) {
@@ -341,6 +347,7 @@ function extractCoinDataInPageContext(): ExtractedCoinFields | null {
 
     return result;
   };
+  const logoUrl = getLogoUrl();
 
   const assetName =
     toText(document.querySelector('h1 .tw-font-bold')) ||
@@ -429,7 +436,8 @@ function extractCoinDataInPageContext(): ExtractedCoinFields | null {
     change30DUsdPct,
     change1YUsdPct,
     assetDescription,
-    assetCategories
+    assetCategories,
+    logoUrl
   };
 }
 

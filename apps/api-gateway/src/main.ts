@@ -3,11 +3,27 @@ import { ApiGatewayModule } from './api-gateway.module';
 import * as cookieParser from 'cookie-parser';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { cleanupOpenApiDoc, ZodValidationPipe } from 'nestjs-zod';
+import * as path from 'node:path';
+import { NestExpressApplication } from '@nestjs/platform-express';
 
 async function bootstrap() {
   const PORT = Number(process.env.PORT ?? 5000)
   const origin = process.env.WEB_ORIGIN
-  const app = await NestFactory.create(ApiGatewayModule);
+  const app = await NestFactory.create<NestExpressApplication>(ApiGatewayModule);
+
+  // берём значения из .env (как в LogoStorageService)
+  const logosDirEnv = process.env.LOGOS_STORAGE_DIR ?? './storage/logos';
+  const logosPrefix = process.env.LOGOS_PUBLIC_PREFIX ?? '/static/logos';
+
+  // певращаем относительный путь в абсолютный
+  const logosDir = path.isAbsolute(logosDirEnv)
+    ? logosDirEnv
+    : path.resolve(process.cwd(), logosDirEnv);
+
+  // /static/logos/crypto/1.png -> {logosDir}/crypto/1.png
+  app.useStaticAssets(logosDir, {
+    prefix: logosPrefix,
+  });
 
   const config = new DocumentBuilder()
     .setTitle('Персональный менеджер инвестиций')

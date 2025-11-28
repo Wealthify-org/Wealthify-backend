@@ -9,6 +9,7 @@ import { PuppeteerService } from './puppeteer.service';
 import { Asset } from "@libs/crypto-data/models";
 import { CryptoDataWorkerService } from './crypto-data-worker.service';
 import { CryptoDataFetcherService } from './crypto-data-fetcher.service';
+import { CryptoLogosModule } from './crypto-logos/crypto-logos.module';
 
 @Module({
   controllers: [CryptoDataWorkerController],
@@ -16,7 +17,8 @@ import { CryptoDataFetcherService } from './crypto-data-fetcher.service';
   imports: [
     ScheduleModule.forRoot(),
     ConfigModule.forRoot({
-          envFilePath: `.${process.env.NODE_ENV}.env`
+      envFilePath: `.${process.env.NODE_ENV}.env`,
+      isGlobal: true,
     }),
     SequelizeModule.forRoot({
           dialect: 'postgres',
@@ -31,6 +33,7 @@ import { CryptoDataFetcherService } from './crypto-data-fetcher.service';
           sync: { alter: true }
     }),
     SequelizeModule.forFeature([CryptoAssetData, CryptoCandle, CryptoChartsData, Asset]),
+    CryptoLogosModule,
   ],
 })
 export class CryptoDataWorkerModule {}

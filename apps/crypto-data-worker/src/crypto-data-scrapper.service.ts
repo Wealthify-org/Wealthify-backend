@@ -13,26 +13,10 @@ import { CryptoDataWorkerService } from './crypto-data-worker.service';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { loadProxiesFromEnv, ProxyConfig } from './proxies';
-
-type WorkerInput = {
-  proxy: ProxyConfig
-  links: string[]; // здесь для бенча будет 1 ссылка на воркер
-};
+import type { WorkerInput } from './workers/crypto-worker-types';
+import { splitIntoBatches, splitIntoChunks } from '@libs/contracts/crypto-data-worker';
 
 const DEBUG_SCREENSHOTS_DIR = path.resolve(process.cwd(), 'debug-screenshots');
-
-function splitIntoChunks<T>(items: T[], chunksCount: number): T[][] {
-  const result: T[][] = [];
-  const chunkSize = Math.ceil(items.length / chunksCount);
-
-  for (let i = 0; i < chunksCount; i++) {
-    const start = i * chunkSize;
-    const end = start + chunkSize;
-    result.push(items.slice(start, end));
-  }
-
-  return result;
-}
 
 @Injectable()
 export class CryptoDataScrapperService {
@@ -71,32 +55,47 @@ export class CryptoDataScrapperService {
     const page = await this.pp.newPage(this.proxies[0]);
 
     try {
-      await this.openAllCryptosPage(page, this.baseUrl);
-      this.log.log('Ждем всех ссылок');
-
-      const { totalCount } = await this.readAllCoinsMeta(page);
-
-      // собираем ссылки и догружаем до 200
-      let links = await this.collectLinks(page);
-      links = await this.loadMoreUntil(page, {
-        startPage: 2,
-        hardLimit: 2000,
-        maxLinks: 200, 
-        totalCount,
-      });
-
-      this.log.log(`Collected ${links.length} links (need first 200).`);
-
-      const top = links.slice(0, 10);
-
+      const top = await this.fetchTopLinks(page, 250);
       // СРАВНЕНИЕ СКОРОСТИ
       // await this.runBenchmarkWithWorkers(top);
 
+      const BATCH_SIZE = 
+        this.proxies.length >= 1 
+          ? 2 * this.proxies.length 
+          : 1;
+      
+      const batches = splitIntoBatches(top, BATCH_SIZE);
+
+      this.log.log(
+        `Total ${top.length} links, ${batches.length} batches with up to ${BATCH_SIZE} links each`,
+      );
+
       this.log.log(`Start parsing ${top.length} assets with parallel Puppeteer browsers...`);
+      
+      for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+        const batchLinks = batches[batchIndex];
 
-      const chunks = splitIntoChunks(top, this.proxies.length);
+        this.log.log(
+          `Start parsing batch ${batchIndex + 1}/${batches.length} with ${batchLinks.length} links...`,
+        );
 
-      await this.workersRun(this.proxies, chunks);
+        // тут уже внутри батча раздаём ссылки по воркерам/прокси
+        const chunks = splitIntoChunks(batchLinks, this.proxies.length);
+
+        const cryptoDatas = await this.workersRun(this.proxies, chunks);
+        this.log.log(
+          `Batch ${batchIndex + 1}: parsed ${cryptoDatas.length} assets, saving to DB...`,
+        );
+
+        // сохраняем только этот батч
+        await this.saveParsedBatchToDb(cryptoDatas);
+
+        this.log.log(
+          `Batch ${batchIndex + 1}: DB save completed for ${cryptoDatas.length} assets`,
+        );
+      }
+
+      this.log.log(`All batches processed`);
     } finally {
       try {
         if (!page.isClosed()) {
@@ -106,7 +105,41 @@ export class CryptoDataScrapperService {
     }
   }
 
-  private async workersRun(proxies: ProxyConfig[], linksChunks: string[][]): Promise<void> {
+  private async fetchTopLinks(page: Page, limit: number): Promise<string[]> {
+    await this.openAllCryptosPage(page, this.baseUrl);
+      this.log.log('Ждем всех ссылок');
+
+      const { totalCount } = await this.readAllCoinsMeta(page);
+
+      // собираем ссылки и догружаем до 1000
+      let links = await this.collectLinks(page);
+      links = await this.loadMoreUntil(page, {
+        startPage: 2,
+        hardLimit: 2000,
+        maxLinks: 1000, 
+        totalCount,
+      });
+
+      this.log.log(`Collected ${links.length} links (need first 200).`);
+
+      return links.slice(0, limit);
+  }
+
+  private async saveParsedBatchToDb(cryptoDatas: CryptoData[]): Promise<void> {
+    for (const cryptoData of cryptoDatas) {
+      try {
+        await this.cryproDataWorkerService.upsertFromCryptoData(cryptoData);
+      } catch (e) {
+        this.log.error(
+          `Failed to upsert data for ${cryptoData.assetTicker}: ${
+            e instanceof Error ? e.message : e
+          }`,
+        );
+      }
+    }
+  }
+
+  private async workersRun(proxies: ProxyConfig[], linksChunks: string[][]): Promise<CryptoData[]> {
     const workerScript = join(
       process.cwd(),
       "dist",
@@ -121,10 +154,10 @@ export class CryptoDataScrapperService {
 
     if (!proxies.length || !linksChunks.length) {
       this.log.warn('No proxies or links — skipping workers run');
-      return;
+      return [];
     }
 
-    const tasks: Promise<void>[] = [];
+    const tasks: Promise<CryptoData[]>[] = []
 
     for(let i = 0; i < Math.min(proxies.length, linksChunks.length); i++) {
       const proxy = proxies[i];
@@ -132,52 +165,59 @@ export class CryptoDataScrapperService {
       if (!links || !links.length) continue;
 
       tasks.push(
-        new Promise<void>((resolve) => {
-          let terminatedByUs = false;
+        new Promise<CryptoData[]>((resolve) => {
+          let settled = false;
 
           const worker = new Worker(workerScript);
           const data: WorkerInput = { proxy, links };
 
-          worker.once("message", async (cryptoDatas: CryptoData[]) => {
-            try {
-              for (const cryptoData of cryptoDatas) {
-                await this.cryproDataWorkerService.upsertFromCryptoData(cryptoData);
-              }
-            } catch (e) {
-              this.log.error(
-                `Failed to upsert data from worker: ${
-                  e instanceof Error ? e.message : e
-                }`,
-              );
-            } finally {
-              terminatedByUs = true;
-              await worker.terminate().catch(() => {});
-              resolve();
-            }
+          worker.once("message", (cryptoDatas: CryptoData[]) => {
+            settled = true;
+            this.log.log(
+              `Worker for ${proxy.host}:${proxy.port} parsed ${cryptoDatas.length} assets`,
+            );
+            worker
+              .terminate()
+              .catch(() => {})
+              .finally(() => resolve(cryptoDatas));
           });
 
-          worker.once("error", async (err) => {
+          worker.once("error", (err) => {
             this.log.error(`ERROR ON WORKER - ${err}`);
-            terminatedByUs = true;
-            await worker.terminate().catch(() => {});
-            resolve();
+            if (!settled) {
+              settled = true;
+              worker
+                .terminate()
+                .catch(() => {})
+                .finally(() => resolve([])); // считаем, что этот воркер ничего не дал
+            }
           });
 
           worker.once("exit", (code) => {
-            if (!terminatedByUs && code !== 0) {
-              this.log.error(`RETURNED WITH NON ZERO CODE - ${code}`);
+            if (!settled && code !== 0) {
+              this.log.error(`Worker exited with non-zero code - ${code}`);
+            } else if (settled) {
+              this.log.log(`Worker for ${proxy.host}:${proxy.port} exited with code ${code} after message`);
             } else {
               this.log.debug?.(`Worker exited with code ${code}`);
             }
-            resolve();
+
+            if (!settled) {
+              settled = true;
+              resolve([]); // воркер вышел, но message не прислал
+            }
           });
 
           worker.postMessage(data);
         }),
       );
     }
+    const resultsByWorker = await Promise.all(tasks);
+    const allCryptoDatas = resultsByWorker.flat();
+
+    this.log.log(`All workers finished. Total parsed assets: ${allCryptoDatas.length}`);
     
-    await Promise.all(tasks);
+    return allCryptoDatas;
   }
 
   private async openAllCryptosPage(page: Page, baseUrl: string): Promise<void> {

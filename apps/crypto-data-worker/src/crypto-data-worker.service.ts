@@ -167,6 +167,7 @@ export class CryptoDataWorkerService {
       description: data.assetDescription || undefined,
       categories: data.assetCategories || undefined,
       source: data.source || undefined,
+      logoUrl: data.logoUrl || undefined,
 
       rank: data.currentAssetRank ?? undefined,
       currentPriceUsd: data.currentPrice ?? undefined,
