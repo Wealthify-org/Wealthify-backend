@@ -1,21 +1,24 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { CryptoDataWorkerController } from './crypto-data-worker.controller';
 import { CryptoDataScrapperService } from './crypto-data-scrapper.service';
 import { ScheduleModule } from '@nestjs/schedule';
 import { SequelizeModule } from '@nestjs/sequelize';
 import { CryptoAssetData, CryptoCandle, CryptoChartsData } from "@libs/crypto-data/models";
 import { PuppeteerService } from './puppeteer.service';
-import { ConfigModule } from '@nestjs/config';
 import { Asset } from "@libs/crypto-data/models";
 import { CryptoDataWorkerService } from './crypto-data-worker.service';
+import { CryptoDataFetcherService } from './crypto-data-fetcher.service';
+import { CryptoLogosModule } from './crypto-logos/crypto-logos.module';
 
 @Module({
   controllers: [CryptoDataWorkerController],
-  providers: [CryptoDataScrapperService, PuppeteerService, CryptoDataWorkerService],
+  providers: [CryptoDataScrapperService, PuppeteerService, CryptoDataWorkerService, CryptoDataFetcherService],
   imports: [
     ScheduleModule.forRoot(),
     ConfigModule.forRoot({
-          envFilePath: `.${process.env.NODE_ENV}.env`
+      envFilePath: `.${process.env.NODE_ENV}.env`,
+      isGlobal: true,
     }),
     SequelizeModule.forRoot({
           dialect: 'postgres',
@@ -30,6 +33,7 @@ import { CryptoDataWorkerService } from './crypto-data-worker.service';
           sync: { alter: true }
     }),
     SequelizeModule.forFeature([CryptoAssetData, CryptoCandle, CryptoChartsData, Asset]),
+    CryptoLogosModule,
   ],
 })
 export class CryptoDataWorkerModule {}

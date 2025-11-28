@@ -58,3 +58,5 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 *.env
 .*.env
 .env.*
+/debug-screenshots/
+/storage

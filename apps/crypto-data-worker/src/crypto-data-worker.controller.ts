@@ -1,8 +1,6 @@
-import { Controller, HttpStatus } from '@nestjs/common';
-import { CryptoDataScrapperService } from './crypto-data-scrapper.service';
+import { Controller} from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 import { CRYPTO_DATA_WORKER_PATTERS } from '@libs/contracts/crypto-data-worker/crypto-data-worker.pattern';
-import { rpcError } from '@libs/contracts/common';
 import { CryptoDataWorkerService } from './crypto-data-worker.service';
 
 @Controller()

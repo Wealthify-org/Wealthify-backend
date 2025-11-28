@@ -1,38 +1,39 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PuppeteerService } from './puppeteer.service';
-import { Cron } from '@nestjs/schedule';
-
-import {
-  RangeToButton,
-  RangeToPriceChartsFile,
-  RangeToDaysParam,
-} from '@libs/contracts/crypto-data-worker';
+import { Cron, CronExpression } from '@nestjs/schedule';
+import { Worker } from "worker_threads";
+import { join } from "node:path";
 
 import type {
-  RangeKey,
-  ChartPayload,
-  CryptoCharts,
   CryptoData,
-  ExtractedCoinFields,
-  Sparkline7D,
-  SeriesPoint,
 } from '@libs/contracts/crypto-data-worker';
-import { HTTPResponse, Page } from 'puppeteer';
+import { Page } from 'puppeteer';
 import { CryptoDataWorkerService } from './crypto-data-worker.service';
+
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { loadProxiesFromEnv, ProxyConfig } from './proxies';
+import type { WorkerInput } from './workers/crypto-worker-types';
+import { splitIntoBatches, splitIntoChunks } from '@libs/contracts/crypto-data-worker';
+
+const DEBUG_SCREENSHOTS_DIR = path.resolve(process.cwd(), 'debug-screenshots');
 
 @Injectable()
 export class CryptoDataScrapperService {
   private readonly log = new Logger('CryptoDataWorker');
   private readonly baseUrl = 'https://www.coingecko.com/en/all-cryptocurrencies';
-  
+  private readonly proxies: ProxyConfig[];
+
   private isRunning = false;
 
   constructor(
     private readonly pp: PuppeteerService,
     private readonly cryproDataWorkerService: CryptoDataWorkerService,
-  ) {}
+  ) {
+    this.proxies = loadProxiesFromEnv();
+  }
 
-  @Cron('*/1 * * * *') // каждые 5 минут
+  @Cron(CronExpression.EVERY_10_SECONDS) // каждые 5 минут
   async collectAllAssetsDataCron() {
     if (this.isRunning) {
       this.log.warn('Previous collectAllAssets run is still in progress, skipping this tick');
@@ -51,48 +52,172 @@ export class CryptoDataScrapperService {
 
   private async collectAllAssets() {
     this.log.log('Collecting TOP-200 from CoinGecko...');
-    const page = await this.pp.newPage();
+    const page = await this.pp.newPage(this.proxies[0]);
 
     try {
-      await this.openAllCryptosPage(page, this.baseUrl);
+      const top = await this.fetchTopLinks(page, 250);
+      // СРАВНЕНИЕ СКОРОСТИ
+      // await this.runBenchmarkWithWorkers(top);
+
+      const BATCH_SIZE = 
+        this.proxies.length >= 1 
+          ? 2 * this.proxies.length 
+          : 1;
+      
+      const batches = splitIntoBatches(top, BATCH_SIZE);
+
+      this.log.log(
+        `Total ${top.length} links, ${batches.length} batches with up to ${BATCH_SIZE} links each`,
+      );
+
+      this.log.log(`Start parsing ${top.length} assets with parallel Puppeteer browsers...`);
+      
+      for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+        const batchLinks = batches[batchIndex];
+
+        this.log.log(
+          `Start parsing batch ${batchIndex + 1}/${batches.length} with ${batchLinks.length} links...`,
+        );
+
+        // тут уже внутри батча раздаём ссылки по воркерам/прокси
+        const chunks = splitIntoChunks(batchLinks, this.proxies.length);
+
+        const cryptoDatas = await this.workersRun(this.proxies, chunks);
+        this.log.log(
+          `Batch ${batchIndex + 1}: parsed ${cryptoDatas.length} assets, saving to DB...`,
+        );
+
+        // сохраняем только этот батч
+        await this.saveParsedBatchToDb(cryptoDatas);
+
+        this.log.log(
+          `Batch ${batchIndex + 1}: DB save completed for ${cryptoDatas.length} assets`,
+        );
+      }
+
+      this.log.log(`All batches processed`);
+    } finally {
+      try {
+        if (!page.isClosed()) {
+          await page.close();
+        }
+      } catch {}
+    }
+  }
+
+  private async fetchTopLinks(page: Page, limit: number): Promise<string[]> {
+    await this.openAllCryptosPage(page, this.baseUrl);
       this.log.log('Ждем всех ссылок');
 
       const { totalCount } = await this.readAllCoinsMeta(page);
 
-      // собираем ссылки и догружаем до 200
+      // собираем ссылки и догружаем до 1000
       let links = await this.collectLinks(page);
       links = await this.loadMoreUntil(page, {
         startPage: 2,
         hardLimit: 2000,
-        maxLinks: 200, 
+        maxLinks: 1000, 
         totalCount,
       });
 
       this.log.log(`Collected ${links.length} links (need first 200).`);
 
-      const top = links.slice(0, 200);
-      for (let i = 0; i < top.length; i++) {
-        const href = top[i];
-        this.log.debug(`[${i + 1}/${top.length}] Parsing: ${href}`);
+      return links.slice(0, limit);
+  }
 
-        try {
-          const data = await this.parseCoin(page, href);
-          await this.cryproDataWorkerService.upsertFromCryptoData(data);
-
-          this.log.debug(
-            `PARSED DATA for ${data.assetTicker} (rank=${data.currentAssetRank}) - ${href}`,
-          );
-        } catch (err) {
-          this.log.warn(
-            `Failed to parse ${href}: ${err instanceof Error ? err.message : err}`,
-          );
-        }
-        // чуть притормаживаем, чтобы не кидать запросы слишком часто
-        await this.sleep(200);
+  private async saveParsedBatchToDb(cryptoDatas: CryptoData[]): Promise<void> {
+    for (const cryptoData of cryptoDatas) {
+      try {
+        await this.cryproDataWorkerService.upsertFromCryptoData(cryptoData);
+      } catch (e) {
+        this.log.error(
+          `Failed to upsert data for ${cryptoData.assetTicker}: ${
+            e instanceof Error ? e.message : e
+          }`,
+        );
       }
-    } finally {
-      await this.pp.onModuleDestroy();
     }
+  }
+
+  private async workersRun(proxies: ProxyConfig[], linksChunks: string[][]): Promise<CryptoData[]> {
+    const workerScript = join(
+      process.cwd(),
+      "dist",
+      "worker-scripts",
+      "crypto-data-worker",
+      "apps",
+      "crypto-data-worker",
+      "src",
+      "workers",
+      "crypto-parser.worker.js",
+    );
+
+    if (!proxies.length || !linksChunks.length) {
+      this.log.warn('No proxies or links — skipping workers run');
+      return [];
+    }
+
+    const tasks: Promise<CryptoData[]>[] = []
+
+    for(let i = 0; i < Math.min(proxies.length, linksChunks.length); i++) {
+      const proxy = proxies[i];
+      const links = linksChunks[i];
+      if (!links || !links.length) continue;
+
+      tasks.push(
+        new Promise<CryptoData[]>((resolve) => {
+          let settled = false;
+
+          const worker = new Worker(workerScript);
+          const data: WorkerInput = { proxy, links };
+
+          worker.once("message", (cryptoDatas: CryptoData[]) => {
+            settled = true;
+            this.log.log(
+              `Worker for ${proxy.host}:${proxy.port} parsed ${cryptoDatas.length} assets`,
+            );
+            worker
+              .terminate()
+              .catch(() => {})
+              .finally(() => resolve(cryptoDatas));
+          });
+
+          worker.once("error", (err) => {
+            this.log.error(`ERROR ON WORKER - ${err}`);
+            if (!settled) {
+              settled = true;
+              worker
+                .terminate()
+                .catch(() => {})
+                .finally(() => resolve([])); // считаем, что этот воркер ничего не дал
+            }
+          });
+
+          worker.once("exit", (code) => {
+            if (!settled && code !== 0) {
+              this.log.error(`Worker exited with non-zero code - ${code}`);
+            } else if (settled) {
+              this.log.log(`Worker for ${proxy.host}:${proxy.port} exited with code ${code} after message`);
+            } else {
+              this.log.debug?.(`Worker exited with code ${code}`);
+            }
+
+            if (!settled) {
+              settled = true;
+              resolve([]); // воркер вышел, но message не прислал
+            }
+          });
+
+          worker.postMessage(data);
+        }),
+      );
+    }
+    const resultsByWorker = await Promise.all(tasks);
+    const allCryptoDatas = resultsByWorker.flat();
+
+    this.log.log(`All workers finished. Total parsed assets: ${allCryptoDatas.length}`);
+    
+    return allCryptoDatas;
   }
 
   private async openAllCryptosPage(page: Page, baseUrl: string): Promise<void> {
@@ -179,449 +304,44 @@ export class CryptoDataScrapperService {
     return links;
   }
 
-  // парсинг конкретной монеты
-  private async parseCoin(page: Page, link: string): Promise<CryptoData> {
-    await page.goto(link);
-    await page.waitForSelector('body', { timeout: 20_000 });
-    await page.waitForSelector('a[href*="/en/categories/"]', { timeout: 15_000 }).catch(() => {});
-
-    const fields = await page.evaluate(extractCoinDataInPageContext);
-    if (!fields) {
-      throw new Error('Failed to extract coin fields from page');
-    }
-
-    const chartByRange: Partial<Record<RangeKey, ChartPayload>> = {};
-    for (const range of ['h24', 'd7', 'd30', 'd90', 'd365', 'max'] as RangeKey[]) {
-      const payload = await this.clickAndGrabChart(page, range);
-      if (!payload) {
-        this.log.debug(`[chart:${range}] payload=null`);
-        continue;
-      }
-      chartByRange[range] = payload;
-      await this.sleep(200); // дать дорисовать график между кликами
-    }
-
-    const charts: CryptoCharts = {
-      h24: chartByRange.h24,
-      d7: chartByRange.d7,
-      d30: chartByRange.d30,
-      d90: chartByRange.d90,
-      d365: chartByRange.d365,
-      max: chartByRange.max,
-    };
-
-    return {
-      ...fields,
-      sparkline7D: this.extractSparklineFromCharts(charts.d7?.stats),
-      charts,
-      source: link,
-    };
-  }
-
-  private extractSparklineFromCharts(chartsD7Stats: SeriesPoint[] | undefined): Sparkline7D | undefined {
-    if (!chartsD7Stats || chartsD7Stats.length === 0) {
-      return undefined;
-    }
-    const sorted = [...chartsD7Stats].sort((a, b) => a[0] - b[0]);
-    const prices = sorted
-      .map(([, price]) => price)
-      .filter((value) => Number.isFinite(value));
-
-    if (prices.length === 0) {
-      return undefined;
-    }
-
-    return { prices };
-  }
-
-  // cъём одного диапазона графика кликом + фолбэки
-  private async clickAndGrabChart(page: Page, range: RangeKey): Promise<ChartPayload | null> {
-    await page.waitForSelector(RangeToButton[range], { timeout: 10_000 });
-    await page
-      .evaluate(() => {
-        const el = document.querySelector('[data-coin-chart-target="rangeSelector"]');
-        if (el) (el as HTMLElement).scrollIntoView({ block: 'center' });
-        window.scrollBy(0, 200);
-      })
-      .catch(() => {});
-
-    const slug = this.getCoinSlugFromUrl(page.url()) || '';
-    const file = RangeToPriceChartsFile[range];
-    const daysParam = RangeToDaysParam[range];
-
-    const toggleMap: Record<RangeKey, RangeKey> = {
-      h24: 'd7',
-      d7: 'd30',
-      d30: 'd90',
-      d90: 'd365',
-      d365: 'max',
-      max: 'd30',
-    };
-
-    const alreadySelected = await page
-      .$eval(
-        RangeToButton[range],
-        (btn: HTMLElement) =>
-          btn.classList.contains('selected') || btn.getAttribute('aria-pressed') === 'true'
-      )
-      .catch(() => false);
-
-    if (alreadySelected) {
-      const alt = toggleMap[range];
-      await page.click(RangeToButton[alt]).catch(() => {});
-      await page
-        .waitForResponse(
-          (res) => {
-            if (!this.isSuccessJson(res)) return false;
-            const u = res.url();
-            const altFile = RangeToPriceChartsFile[alt];
-            const re = slug
-              ? new RegExp(`/price_charts/${slug}/usd/${altFile}(\\?|$)`, 'i')
-              : new RegExp(`/price_charts/[^/]+/usd/${altFile}(\\?|$)`, 'i');
-            return re.test(u);
-          },
-          { timeout: 12_000 }
-        )
-        .catch(() => {});
-    }
-
-    const waitResp = page.waitForResponse(
-      (res) => {
-        if (!this.isChartResponse(res)) return false;
-        const u = res.url();
-        let ok = /\/price_charts\//i.test(u) && new RegExp(`/usd/${file}(\\?|$)`, 'i').test(u);
-        if (ok && slug)
-          ok = new RegExp(`/price_charts/${slug}/usd/${file}(\\?|$)`, 'i').test(u);
-        return ok || /\/(market_chart|ohlc)\b/i.test(u);
-      },
-      { timeout: 30_000 }
-    );
-
-    const directFetchPromise = this.directPriceChartsFetch(page, slug, file);
-
-    await page.click(RangeToButton[range]).catch(() => {});
-
-    const payload = await Promise.race([
-      (async () => {
-        try {
-          const resp = await waitResp;
-          // console.log(
-          //   `[chart:${range}] ${resp.status()} ${resp.url()} ct=${resp.headers()['content-type']}`
-          // );
-          return await this.normalizeChartPayload(resp);
-        } catch {
-          return null;
-        }
-      })(),
-      directFetchPromise,
-    ]);
-
-    if (payload?.stats?.length) return payload;
-
-    this.log.debug(`[chart:${range}] primary+direct failed, trying market_chart fallback`);
-    const mc = await this.directMarketChartFetch(page, slug, daysParam);
-    if (mc?.stats?.length) {
-      this.log.debug(`[chart:${range}] market_chart fallback ok for ${slug} days=${daysParam}`);
-      return mc;
-    }
-
-    this.log.debug(`[chart:${range}] no data after all fallbacks`);
-    return null;
-  }
-
   // утилиты
   private sleep(ms: number): Promise<void> {
     return new Promise<void>((resolve) => setTimeout(resolve, ms));
   }
 
-  private isSuccessJson(res: HTTPResponse): boolean {
-    const status = res.status();
-    const ok = (status >= 200 && status < 300) || status === 304;
-    if (!ok) return false;
-    const ct = (res.headers()['content-type'] || '').toLowerCase();
-    return /json|javascript/.test(ct);
-  }
-
-  private isChartResponse(res: HTTPResponse): boolean {
-    if (!this.isSuccessJson(res)) return false;
-    const url = res.url();
-    return /\/(market_chart|ohlc|price_charts)\b/i.test(url);
-  }
-
-  private getCoinSlugFromUrl(u: string): string | null {
-    try {
-      const url = new URL(u);
-      const m1 = url.pathname.match(/\/en\/coins\/([^/]+)/i);
-      if (m1) return m1[1];
-      const m2 = url.pathname.match(/\/price_charts\/([^/]+)/i);
-      if (m2) return m2[1];
-      return null;
-    } catch {
-      return null;
-    }
-  }
-
-  // нормализация графиков
-  private normalizeChartData(data: any): ChartPayload | null {
-    if (Array.isArray(data?.stats) && Array.isArray(data?.total_volumes)) {
-      return { stats: data.stats, total_volumes: data.total_volumes };
-    }
-    if (Array.isArray(data?.prices) && Array.isArray(data?.total_volumes)) {
-      return { stats: data.prices, total_volumes: data.total_volumes };
-    }
-    if (Array.isArray(data?.data?.prices) && Array.isArray(data?.data?.total_volumes)) {
-      return { stats: data.data.prices, total_volumes: data.data.total_volumes };
-    }
-    if (Array.isArray(data) && Array.isArray(data[0]) && data[0].length >= 5) {
-      const stats: [number, number][] = data.map((d: any[]) => [Number(d[0]), Number(d[4])]);
-      return { stats, total_volumes: [] };
-    }
-    return null;
-    }
-
-  private async normalizeChartPayload(resp: HTTPResponse): Promise<ChartPayload | null> {
-    try {
-      const data = await resp.json();
-      return this.normalizeChartData(data);
-    } catch {
-      return null;
-    }
-  }
-
-  // прямые fetch-ы (в браузерном контексте)
-  private async directPriceChartsFetch(
+  private async safeDebugScreenshot(
     page: Page,
-    slug: string,
-    file: string
-  ): Promise<ChartPayload | null> {
-    if (!slug) return null;
-    const url = `/price_charts/${slug}/usd/${file}?_=${Date.now()}`;
-    const data = await page
-      .evaluate((u: string) => {
-        return fetch(u, {
-          credentials: 'same-origin',
-          headers: { accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-          cache: 'no-store',
-        })
-          .then((r) => (r.ok ? r.json() : null))
-          .catch((): null => null);
-      }, url)
-      .catch((): null => null);
-
-    return data ? this.normalizeChartData(data) : null;
-  }
-
-  private async directMarketChartFetch(
-    page: Page,
-    slug: string,
-    daysParam: string
-  ): Promise<ChartPayload | null> {
-    if (!slug) return null;
-    const url = `/api/v3/coins/${slug}/market_chart?vs_currency=usd&days=${encodeURIComponent(
-      daysParam
-    )}&_=${Date.now()}`;
-
-    const data = await page
-      .evaluate((u: string) => {
-        return fetch(u, {
-          credentials: 'same-origin',
-          headers: { accept: 'application/json' },
-          cache: 'no-store',
-        })
-          .then((r) => (r.ok ? r.json() : null))
-          .catch((): null => null);
-      }, url)
-      .catch((): null => null);
-
-    return data ? this.normalizeChartData(data) : null;
-  }
-}
-
-// топ-левел функция для page.evaluate 
-function extractCoinDataInPageContext(): ExtractedCoinFields | null {
-  const toText = (el: Element | null): string => (el?.textContent || '').trim();
-  const toNumber = (s: string): number => {
-    const cleaned = s.replace(/[^0-9.\-]/g, '');
-    return cleaned ? parseFloat(cleaned) : 0;
-  };
-
-  const getTdByLabel = (exact: string): HTMLElement | null => {
-    const rows = Array.from(document.querySelectorAll('table.tw-w-full tbody tr'));
-    for (const r of rows) {
-      const th = r.querySelector('th');
-      if (!th) continue;
-      let label = '';
-      for (const node of Array.from(th.childNodes)) {
-        if (node.nodeType === Node.TEXT_NODE) {
-          const t = (node.textContent || '').trim();
-          if (t) { label = t; break; }
-        }
-      }
-      if (label.toLowerCase() === exact.toLowerCase()) {
-        return r.querySelector('td') as HTMLElement | null;
-      }
-    }
-    return null;
-  };
-
-  const readMoney = (td: HTMLElement | null): number => {
-    if (!td) return 0;
-    const span = td.querySelector('span[data-price-target="price"]') as HTMLElement | null;
-    const v = span?.getAttribute('data-price-usd');
-    return v ? parseFloat(v) : toNumber((span ? span.textContent : td.textContent) || '');
-  };
-
-  const readAmount = (td: HTMLElement | null): number => toNumber((td?.textContent || '').trim());
-
-  const getChange = (index: number): number => {
-    const row = document.querySelector('table.tw-overflow-hidden tbody tr');
-    if (!row) return 0;
-    const tds = row.querySelectorAll('td');
-    const td = tds[index] as HTMLTableCellElement | undefined;
-    if (!td) return 0;
-    const span = td.querySelector('span[data-percent-change-target="percent"]') as HTMLElement | null;
-    if (!span) return 0;
-
+    href: string,
+    context: string,
+  ): Promise<void> {
     try {
-      const raw = span.getAttribute('data-json') || '{}';
-      const obj = JSON.parse(raw);
-      const v = typeof obj.usd === 'number' ? obj.usd : NaN;
-      if (Number.isFinite(v)) return v;
-    } catch {}
+      if (page.isClosed()) {
+        this.log.warn(
+          `Cannot take screenshot for ${href}: page is already closed`,
+        );
+        return;
+      }
 
-    return toNumber(toText(span));
-  };
+      await fs.promises.mkdir(DEBUG_SCREENSHOTS_DIR, { recursive: true });
 
-  const chipText = (a: HTMLAnchorElement): string => {
-    const inner = a.querySelector('.tw-overflow-ellipsis, .tw-text-xs, div');
-    const raw = (inner?.textContent ?? a.textContent ?? '').trim();
-    if (/^\d+\s+more$/i.test(raw)) return '';
-    if (/^suggest a category$/i.test(raw)) return '';
-    return raw.replace(/\s+/g, ' ').trim();
-  };
+      const ts = new Date().toISOString().replace(/[:.]/g, '-');
+      const safeHref = href.replace(/[^a-z0-9_-]/gi, '_').slice(0, 80);
+      const filename = `${context}_${safeHref}_${ts}.png`;
 
-  const stripHtmlExceptLinks = (html: string): string => {
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    const root = doc.body;
+      const fullPath = path.join(DEBUG_SCREENSHOTS_DIR, filename);
 
-    root.querySelectorAll('script, style, noscript, template, iframe').forEach((n) => n.remove());
-    root.querySelectorAll('h1,h2,h3,h4,h5,h6').forEach((h) => h.remove());
-
-    const unwrapChildren = (el: Element) => {
-      Array.from(el.children).forEach((child) => {
-        if (child.tagName === 'A') {
-          const keep = new Set(['href', 'target', 'rel']);
-          Array.from(child.attributes).forEach((attr) => {
-            if (!keep.has(attr.name)) child.removeAttribute(attr.name);
-          });
-          if (child.getAttribute('target') === '_blank' && !child.getAttribute('rel')) {
-            child.setAttribute('rel', 'noopener noreferrer');
-          }
-          unwrapChildren(child);
-        } else {
-          while (child.firstChild) el.insertBefore(child.firstChild, child);
-          child.remove();
-        }
+      await page.screenshot({
+        path: fullPath as `${string}.png`,
+        fullPage: true,
       });
-    };
 
-    unwrapChildren(root);
-
-    const result = root.innerHTML
-      .replace(/\s*\n+\s*/g, ' ')
-      .replace(/\s{2,}/g, ' ')
-      .trim();
-
-    return result;
-  };
-
-  const assetName =
-    toText(document.querySelector('h1 .tw-font-bold')) ||
-    toText(document.querySelector('h1 [data-view-component="true"].tw-font-bold')) ||
-    toText(document.querySelector('h1')) ||
-    '';
-
-  let priceSpanText = toText(document.querySelector('h1 span'));
-  let assetTicker = '';
-  if (/price/i.test(priceSpanText)) {
-    assetTicker = priceSpanText.replace(/price/i, '').trim();
-  } else {
-    const m = assetName.match(/\(([A-Z0-9]{2,10})\)/);
-    if (m) assetTicker = m[1];
+      this.log.warn(`Saved debug screenshot for ${href} to ${fullPath}`);
+    } catch (e) {
+      this.log.error(
+        `Failed to save screenshot for ${href}: ${
+          e instanceof Error ? e.message : e
+        }`,
+      );
+    }
   }
-
-  let currentAssetRank = 0;
-  const maybeRank = Array.from(document.querySelectorAll('div,span'))
-    .map((e) => toText(e))
-    .find((t) => /^#\s*\d+/.test(t));
-  if (maybeRank) currentAssetRank = parseInt(maybeRank.replace(/[^\d]/g, ''), 10) || 0;
-
-  const priceEl = document.querySelector(
-    'span[data-price-target="price"][data-converter-target="price"]'
-  ) as HTMLElement | null;
-  const attrUsd = priceEl?.getAttribute('data-price-usd') || '';
-  const currentPrice = attrUsd
-    ? parseFloat(attrUsd)
-    : parseFloat((priceEl?.textContent || '').replace(/[^\d.-]/g, ''));
-
-  const marketCap = readMoney(getTdByLabel('Market Cap'));
-  const fdv = readMoney(getTdByLabel('Fully Diluted Valuation'));
-  const volume24H = readMoney(getTdByLabel('24 Hour Trading Vol'));
-
-  const circulatingSupply = readAmount(getTdByLabel('Circulating Supply'));
-  const totalSupply = readAmount(getTdByLabel('Total Supply'));
-
-  const maxTd = getTdByLabel('Max Supply');
-  const maxTxt = (maxTd?.textContent || '').trim();
-  const maxNum = toNumber(maxTxt);
-  const maxSupply: number | string = maxNum > 0 ? maxNum : (maxTxt || '');
-
-  const change1HUsdPct = getChange(0);
-  const change24HUsdPct = getChange(1);
-  const change7DUsdPct = getChange(2);
-  const change14DUsdPct = getChange(3);
-  const change30DUsdPct = getChange(4);
-  const change1YUsdPct = getChange(5);
-
-  const catAnchors = Array.from(
-    document.querySelectorAll<HTMLAnchorElement>('a[href*="/en/categories/"]')
-  );
-  const categories = Array.from(new Set(catAnchors.map(chipText).filter(Boolean)));
-  const assetCategories = categories.join(';');
-
-  const container = document.querySelector('#about .coin-page-editorial-content');
-  if (!container) return null;
-
-  const clone = container.cloneNode(true) as HTMLElement;
-
-  const faqsHeader = clone.querySelector('.headline4 h2');
-  if (faqsHeader) {
-    const headlineBlock = faqsHeader.closest('.headline4') as HTMLElement | null;
-    headlineBlock?.remove();
-  }
-
-  const html = clone.innerHTML;
-  const cutIndex = html.search(/<h2[^>]*>\s*Bitcoin\s+FAQs\s*<\/h2>/i);
-  const assetDescription = stripHtmlExceptLinks(cutIndex > -1 ? html.slice(0, cutIndex) : html);
-
-  return {
-    assetName,
-    assetTicker,
-    currentAssetRank,
-    currentPrice,
-    marketCap,
-    fdv,
-    volume24H,
-    circulatingSupply,
-    totalSupply,
-    maxSupply,
-    change1HUsdPct,
-    change24HUsdPct,
-    change7DUsdPct,
-    change14DUsdPct,
-    change30DUsdPct,
-    change1YUsdPct,
-    assetDescription,
-    assetCategories
-  };
 }

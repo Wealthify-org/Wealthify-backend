@@ -10,12 +10,14 @@ import { TransactionsModule } from '@gateway/transactions/transactions.module';
 import { UsersModule } from '@gateway/users/users.module';
 import { CryptoDataWorkerModule } from './crypto-data-worker/crypto-data-worker.module';
 import { PortfolioAssetsModule } from './portfolio-assets/portfolio-assets.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       envFilePath: `.${process.env.NODE_ENV}.env`
     }),
+    ScheduleModule.forRoot(),
     AssetsModule,
     AuthModule,
     PortfoliosModule,

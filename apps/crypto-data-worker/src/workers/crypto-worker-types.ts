@@ -1,3 +1,10 @@
+import { ProxyConfig } from "@crypto-worker/proxies";
+
+export type WorkerInput = {
+  proxy: ProxyConfig
+  links: string[]; // здесь для бенча будет 1 ссылка на воркер
+};
+
 // базовые типы графиков 
 export type SeriesPoint = [number, number];
 
@@ -14,10 +21,8 @@ export type Sparkline7D = {
   prices: number[];
 };
 
-
 export type Candle = { t: number; o: number; h: number; l: number; c: number; v?: number };
 export type CandlesByRange = Partial<Record<RangeKey, Candle[]>>;
-
 
 export type CryptoData = {
   assetName: string;
