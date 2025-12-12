@@ -2,25 +2,85 @@ import { Inject, Injectable } from "@nestjs/common";
 import { WORKER_CLIENT } from "./constant";
 import { ClientProxy } from "@nestjs/microservices";
 import { sendOrThrow } from "@libs/contracts/common/rpc/client";
-import { CRYPTO_DATA_WORKER_PATTERS } from "@libs/contracts/crypto-data-worker/crypto-data-worker.pattern";
+import { CRYPTO_DATA_WORKER_PATTERNS } from "@libs/contracts/crypto-data-worker/crypto-data-worker.pattern";
+import { SearchAssetsHttpResponse } from "@libs/contracts/crypto-data-worker";
 
 @Injectable()
 export class CryptoDataWorkerService {
   constructor(@Inject(WORKER_CLIENT) private readonly workerMs: ClientProxy) {}
 
   health() {
-    return sendOrThrow(this.workerMs, CRYPTO_DATA_WORKER_PATTERS.HEALTH, {});
+    return sendOrThrow(this.workerMs, CRYPTO_DATA_WORKER_PATTERNS.HEALTH, {});
   }
 
   getAssetDataByTicker(ticker: string) {
-    return sendOrThrow(this.workerMs, CRYPTO_DATA_WORKER_PATTERS.GET_ASSET_BY_TICKER, { ticker });
+    return sendOrThrow(this.workerMs, CRYPTO_DATA_WORKER_PATTERNS.GET_ASSET_BY_TICKER, { ticker });
   }
 
   getAssetChartsByTicker(ticker: string) {
-    return sendOrThrow(this.workerMs, CRYPTO_DATA_WORKER_PATTERS.GET_CHARTS_BY_TICKER, { ticker });
+    return sendOrThrow(this.workerMs, CRYPTO_DATA_WORKER_PATTERNS.GET_CHARTS_BY_TICKER, { ticker });
   }
 
   listAssets(limit?: number, offset?: number) {
-    return sendOrThrow(this.workerMs, CRYPTO_DATA_WORKER_PATTERS.LIST_ASSETS, { limit, offset });
+    return sendOrThrow(this.workerMs, CRYPTO_DATA_WORKER_PATTERNS.LIST_ASSETS, { limit, offset });
+  }
+
+  searchAssets(query: string, limit?: number) {
+    const safeLimit = typeof limit === "number" && Number.isFinite(limit) ? limit : undefined;
+
+    return sendOrThrow(
+      this.workerMs,
+      CRYPTO_DATA_WORKER_PATTERNS.SEARCH_ASSETS,
+      {
+        query,
+        limit: safeLimit
+      }
+    )
+  }
+
+  getRecentSearches(userId: number, limit?: number) {
+    const safeLimit =
+      typeof limit === "number" && Number.isFinite(limit) ? limit : undefined;
+
+    return sendOrThrow<SearchAssetsHttpResponse>(
+      this.workerMs,
+      CRYPTO_DATA_WORKER_PATTERNS.LIST_RECENT_SEARCHES,
+      {
+        userId,
+        limit: safeLimit,
+      },
+    );
+  }
+
+  addRecentSearch(userId: number, assetId: number) {
+    return sendOrThrow<void>(
+      this.workerMs,
+      CRYPTO_DATA_WORKER_PATTERNS.ADD_RECENT_SEARCH,
+      {
+        userId,
+        assetId,
+      },
+    );
+  }
+
+  removeRecentSearch(userId: number, recentId: number) {
+    return sendOrThrow<void>(
+      this.workerMs,
+      CRYPTO_DATA_WORKER_PATTERNS.REMOVE_RECENT_SEARCH,
+      {
+        userId,
+        recentId,
+      },
+    );
+  }
+
+  clearRecentSearches(userId: number) {
+    return sendOrThrow<void>(
+      this.workerMs,
+      CRYPTO_DATA_WORKER_PATTERNS.CLEAR_RECENT_SEARCHES,
+      {
+        userId,
+      },
+    );
   }
 }

@@ -10,10 +10,12 @@ import { Asset } from "@libs/crypto-data/models";
 import { CryptoDataWorkerService } from './crypto-data-worker.service';
 import { CryptoDataFetcherService } from './crypto-data-fetcher.service';
 import { CryptoLogosModule } from './crypto-logos/crypto-logos.module';
+import { RecentSearch } from '@libs/crypto-data/models/recent-search.model';
+import { RecentSearchesService } from './recent-searches.service';
 
 @Module({
   controllers: [CryptoDataWorkerController],
-  providers: [CryptoDataScrapperService, PuppeteerService, CryptoDataWorkerService, CryptoDataFetcherService],
+  providers: [CryptoDataScrapperService, PuppeteerService, CryptoDataWorkerService, CryptoDataFetcherService, RecentSearchesService],
   imports: [
     ScheduleModule.forRoot(),
     ConfigModule.forRoot({
@@ -27,12 +29,12 @@ import { CryptoLogosModule } from './crypto-logos/crypto-logos.module';
           username: process.env.POSTGRES_USER,
           password: process.env.POSTGRES_PASSWORD,
           database: process.env.POSTGRES_DB,
-          models: [CryptoAssetData, CryptoCandle, CryptoChartsData, Asset],
+          models: [CryptoAssetData, CryptoCandle, CryptoChartsData, Asset, RecentSearch],
           autoLoadModels: true,
           synchronize: true, // включи это временно
           sync: { alter: true }
     }),
-    SequelizeModule.forFeature([CryptoAssetData, CryptoCandle, CryptoChartsData, Asset]),
+    SequelizeModule.forFeature([CryptoAssetData, CryptoCandle, CryptoChartsData, Asset, RecentSearch]),
     CryptoLogosModule,
   ],
 })

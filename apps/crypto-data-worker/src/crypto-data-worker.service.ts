@@ -2,9 +2,10 @@ import { HttpStatus, Injectable, Logger } from "@nestjs/common";
 import { InjectConnection, InjectModel } from "@nestjs/sequelize";
 import { CryptoAssetCreationAttrs, CryptoAssetData, CryptoChartsData } from "@libs/crypto-data/models";
 import { Asset } from '../../../libs/crypto-data/models/asset.model';
-import { Sequelize } from "sequelize";
+import { Op, Sequelize, literal } from "sequelize";
 import { AssetType, ChartPayload, CryptoData, RangeKey, SeriesPoint } from "@libs/contracts";
 import { rpcError } from "@libs/contracts/common";
+import { SearchAssetDto, SearchAssetsHttpResponse, SearchAssetsParams } from "@libs/contracts/crypto-data-worker";
 
 
 @Injectable()
@@ -83,6 +84,66 @@ export class CryptoDataWorkerService {
     }
 
     return assetData.charts ?? null;
+  }
+
+  async searchAssets(params: SearchAssetsParams): Promise<SearchAssetsHttpResponse> {
+    const rawQuery = params.query?.trim();
+    console.log(`ENTERED - ${rawQuery}`)
+    this.log.log(`ENTERED - ${rawQuery}`)
+    if (!rawQuery) {
+      return { items: [] };
+    }
+
+    const limit = params.limit && params.limit > 0 && params.limit <= 50 ? params.limit : 10;
+
+    const q = rawQuery;
+    const ilike = `%${q}%`;
+
+    const rows = await this.cryptoAssetRepo.findAll({
+      limit, 
+      include: [
+        {
+          model: this.assetRepo,
+          required: true,
+        },
+      ],
+      where: {
+        [Op.or]: [
+          { ticker: { [Op.iLike]: ilike } },
+          { name: { [Op.iLike]: ilike } },
+          { categories: { [Op.iLike]: ilike } },
+          { contractAddress: { [Op.iLike]: ilike } },
+        ],
+      },
+      order: [
+        [
+          literal(
+            `CASE 
+              WHEN "CryptoAssetData"."ticker" ILIKE '${q}' THEN 0
+              WHEN "CryptoAssetData"."ticker" ILIKE '${q}%' THEN 1
+              WHEN "CryptoAssetData"."contractAddress" ILIKE '${q}' THEN 2
+              ELSE 3
+            END`,
+          ),
+          "ASC",
+        ],
+        ["rank", "ASC"],
+      ],
+    });
+
+    const items: SearchAssetDto[] = rows.map((row) => ({
+      id: row.assetId,
+      name: row.name,
+      ticker: row.ticker,
+      logoUrlLocal: row.logoUrlLocal ?? null,
+      rank: row.rank ?? null,
+      currentPriceUsd: row.currentPriceUsd ?? null,
+      change24HUsdPct: row.change24HUsdPct ?? null,
+      categories: row.categories ?? null,
+      contractAddress: row.contractAddress ?? null,
+    }));
+
+    return { items };
   }
 
   async upsertFromCryptoData(payload: CryptoData) {
@@ -176,6 +237,7 @@ export class CryptoDataWorkerService {
       circulatingSupply: data.circulatingSupply ?? undefined,
       totalSupply: data.totalSupply ?? undefined,
       maxSupply: normalizeMaxSupply(data.maxSupply),
+      contractAddress: data.contractAddress ?? null,
       volume24HUsd: data.volume24H ?? undefined,
 
       change1HUsdPct: data.change1HUsdPct ?? undefined,

@@ -1,6 +1,7 @@
-import { Controller, Get, HttpCode, HttpStatus, Param, Post, Query } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpStatus, Param, Post, Query } from "@nestjs/common";
 import { ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { CryptoDataWorkerService } from "./crypto-data-worker.service";
+import { SearchAssetsHttpResponse } from "@libs/contracts/crypto-data-worker";
 
 @ApiTags('Crypto Data Worker')
 @Controller('crypto-data-worker')
@@ -11,48 +12,6 @@ export class CryptoDataWorkerController {
   @Get('health')
   health() {
     return this.cryptoDataWorkerService.health();
-  }
-
-
-  @ApiOperation({
-    summary: 'Получить данные по активу по тикеру',
-    description:
-      'Возвращает последний снапшот данных по указанному тикеру (цена, капа, изменения, описание и т.д.).',
-  })
-  @ApiParam({
-    name: 'ticker',
-    description: 'Тикер актива (нечувствителен к регистру)',
-    example: 'BTC',
-  })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Данные по активу найдены',
-    schema: {
-      example: {
-        ticker: 'BTC',
-        name: 'Bitcoin',
-        rank: 1,
-        currentPriceUsd: 68000.12,
-        marketCapUsd: 1340000000000,
-        fdvUsd: 1340000000000,
-        volume24HUsd: 32000000000,
-        change1HUsdPct: 0.52,
-        change24HUsdPct: -2.15,
-        change7DUsdPct: 5.42,
-        sparkline7D: {
-          prices: [67000.1, 67125.5, 66543.2],
-        },
-        lastUpdatedAt: '2025-11-08T10:26:34.123Z',
-      },
-    },
-  })
-  @ApiResponse({
-    status: HttpStatus.NOT_FOUND,
-    description: 'Актив с указанным тикером не найден',
-  })
-  @Get(':ticker')
-  async getAssetData(@Param('ticker') ticker: string) {
-    return this.cryptoDataWorkerService.getAssetDataByTicker(ticker);
   }
 
   @ApiOperation({
@@ -104,6 +63,19 @@ export class CryptoDataWorkerController {
     return this.cryptoDataWorkerService.listAssets(Number(limit), Number(offset));
   }
 
+  @Get("search")
+  async searchAssets(
+    @Query("q") q: string,
+    @Query("limit") limit = "8"
+  ): Promise<SearchAssetsHttpResponse> {
+    const query = q?.trim();
+
+    if (!query || query.length < 2) {
+      return { items: [] };
+    }
+
+    return this.cryptoDataWorkerService.searchAssets(query, Number(limit))
+  }
 
   @ApiOperation({
     summary: 'Получить данные графиков по тикеру',
@@ -146,4 +118,131 @@ export class CryptoDataWorkerController {
   async getAssetChartsData(@Param('ticker') ticker: string) {
     return this.cryptoDataWorkerService.getAssetChartsByTicker(ticker);
   }
+
+  @ApiOperation({
+    summary: "Получить недавние поисковые запросы пользователя",
+  })
+  @ApiQuery({
+    name: "limit",
+    required: false,
+    description: "Максимум записей (по умолчанию 10, максимум — 10)",
+    example: 8,
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: "Список недавних поисков",
+  })
+  @Get("search/recent")
+  async getRecentSearches(
+    // @CurrentUser() user: CurrentUserPayload,
+    @Query("limit") limit?: string,
+  ): Promise<SearchAssetsHttpResponse> {
+    // const userId = user.id;
+    const userId = 1; // TODO: заменить на user.id
+    return this.cryptoDataWorkerService.getRecentSearches(
+      userId,
+      limit ? Number(limit) : undefined,
+    );
+  }
+
+  @ApiOperation({
+    summary: "Добавить актив в список недавних поисков",
+  })
+  @ApiResponse({
+    status: HttpStatus.NO_CONTENT,
+    description: "Запись добавлена",
+  })
+
+  @Post("search/recent")
+  async addRecentSearch(
+    // @CurrentUser() user: CurrentUserPayload,
+    @Body() body: { assetId: number },
+  ): Promise<void> {
+    // const userId = user.id;
+    const userId = 1; // TODO: заменить на user.id
+    await this.cryptoDataWorkerService.addRecentSearch(userId, body.assetId);
+  }
+
+  @ApiOperation({
+    summary: "Удалить один элемент из списка недавних поисков",
+  })
+  @ApiParam({
+    name: "id",
+    description: "ID записи недавнего поиска",
+    example: 12,
+  })
+  @ApiResponse({
+    status: HttpStatus.NO_CONTENT,
+    description: "Запись удалена",
+  })
+  @Delete("search/recent/:id")
+  async removeRecentSearch(
+    // @CurrentUser() user: CurrentUserPayload,
+    @Param("id") id: string,
+  ): Promise<void> {
+    // const userId = user.id;
+    const userId = 1; // TODO: заменить на user.id
+    await this.cryptoDataWorkerService.removeRecentSearch(
+      userId,
+      Number(id),
+    );
+  }
+
+  @ApiOperation({
+    summary: "Очистить все недавние поисковые запросы пользователя",
+  })
+  @ApiResponse({
+    status: HttpStatus.NO_CONTENT,
+    description: "Список недавних очищен",
+  })
+  @Delete("search/recent")
+  async clearRecentSearches(
+    // @CurrentUser() user: CurrentUserPayload,
+  ): Promise<void> {
+    // const userId = user.id;
+    const userId = 1; // TODO: заменить на user.id
+    await this.cryptoDataWorkerService.clearRecentSearches(userId);
+  }
+
+    @ApiOperation({
+    summary: 'Получить данные по активу по тикеру',
+    description:
+      'Возвращает последний снапшот данных по указанному тикеру (цена, капа, изменения, описание и т.д.).',
+  })
+  @ApiParam({
+    name: 'ticker',
+    description: 'Тикер актива (нечувствителен к регистру)',
+    example: 'BTC',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Данные по активу найдены',
+    schema: {
+      example: {
+        ticker: 'BTC',
+        name: 'Bitcoin',
+        rank: 1,
+        currentPriceUsd: 68000.12,
+        marketCapUsd: 1340000000000,
+        fdvUsd: 1340000000000,
+        volume24HUsd: 32000000000,
+        change1HUsdPct: 0.52,
+        change24HUsdPct: -2.15,
+        change7DUsdPct: 5.42,
+        sparkline7D: {
+          prices: [67000.1, 67125.5, 66543.2],
+        },
+        lastUpdatedAt: '2025-11-08T10:26:34.123Z',
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Актив с указанным тикером не найден',
+  })
+  @Get(':ticker')
+  async getAssetData(@Param('ticker') ticker: string) {
+    return this.cryptoDataWorkerService.getAssetDataByTicker(ticker);
+  }
+
 }
