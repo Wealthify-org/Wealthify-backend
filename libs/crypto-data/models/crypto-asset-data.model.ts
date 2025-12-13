@@ -26,6 +26,7 @@ export interface CryptoAssetCreationAttrs {
   circulatingSupply?: number;
   totalSupply?: number;
   maxSupply: string | null;
+  contractAddress?: string | null;
   volume24HUsd?: number
 
   change1HUsdPct?: number;
@@ -108,6 +109,14 @@ export class CryptoAssetData extends Model<CryptoAssetData, CryptoAssetCreationA
  @ApiProperty({ example: '21000000', description: 'Максимальная эмиссия. Может быть числом в строке или unnlimited', required: false })
   @Column({ type: DataType.STRING, allowNull: true, })
   declare maxSupply: string | null;
+
+  @ApiProperty({
+    example: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+    description: "Основной смарт-контракт токена (ERC-20, BEP-20 и т.п.)",
+    required: false,
+  })
+  @Column({ type: DataType.STRING(128), allowNull: true })
+  declare contractAddress: string | null; 
 
   @ApiProperty({ example: '32000000000', description: 'Объём торгов за 24ч USD', required: false })
   @Column({ type: DataType.DOUBLE, allowNull: true })

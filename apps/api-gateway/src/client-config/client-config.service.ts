@@ -59,7 +59,18 @@ export class ClientConfigService {
     return this.rmqOptions(RabbitMqQueueEnv.IDENTITY_QUEUE);
   }
 
+  // опции для клиента к микросервису portfolio-core
   get portfolioClientOptions(): ClientOptions {
-  return this.rmqOptions(RabbitMqQueueEnv.PORTFOLIO_QUEUE);
-}
+    return this.rmqOptions(RabbitMqQueueEnv.PORTFOLIO_QUEUE);
+  }
+
+  // опции для клиента к микросервису indexes-data-worker
+  get indexesWorkerClientOptions(): ClientOptions {
+    return this.rmqOptions(RabbitMqQueueEnv.INDEXES_QUEUE);
+  }
+
+  // опции для клиента к микросервису stock-data-worker
+  get stocksWorkerClientOptions(): ClientOptions {
+    return this.rmqOptions(RabbitMqQueueEnv.STOCKS_QUEUE);
+  }
 }

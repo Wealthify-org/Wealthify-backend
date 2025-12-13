@@ -11,6 +11,8 @@ import { UsersModule } from '@gateway/users/users.module';
 import { CryptoDataWorkerModule } from './crypto-data-worker/crypto-data-worker.module';
 import { PortfolioAssetsModule } from './portfolio-assets/portfolio-assets.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { IndexesDataWorkerModule } from './indexes-data-worker/indexes-data-worker.module';
+import { StockDataWorkerModule } from './stock-data-worker/stock-data-worker.module';
 
 @Module({
   imports: [
@@ -25,7 +27,9 @@ import { ScheduleModule } from '@nestjs/schedule';
     TransactionsModule,
     UsersModule,
     CryptoDataWorkerModule,
-    PortfolioAssetsModule
+    PortfolioAssetsModule,
+    IndexesDataWorkerModule,
+    StockDataWorkerModule
   ],
   controllers: [ApiGatewayController],
   providers: [ApiGatewayService],

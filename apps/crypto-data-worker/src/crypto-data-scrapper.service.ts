@@ -17,7 +17,7 @@ import type { WorkerInput } from './workers/crypto-worker-types';
 import { splitIntoBatches, splitIntoChunks } from '@libs/contracts/crypto-data-worker';
 
 const DEBUG_SCREENSHOTS_DIR = path.resolve(process.cwd(), 'debug-screenshots');
-
+const LINKS_TO_PARSE = 1000;
 @Injectable()
 export class CryptoDataScrapperService {
   private readonly log = new Logger('CryptoDataWorker');
@@ -33,7 +33,7 @@ export class CryptoDataScrapperService {
     this.proxies = loadProxiesFromEnv();
   }
 
-  @Cron(CronExpression.EVERY_10_SECONDS) // каждые 5 минут
+  // @Cron(CronExpression.EVERY_10_SECONDS) // каждые 5 минут
   async collectAllAssetsDataCron() {
     if (this.isRunning) {
       this.log.warn('Previous collectAllAssets run is still in progress, skipping this tick');
@@ -55,7 +55,7 @@ export class CryptoDataScrapperService {
     const page = await this.pp.newPage(this.proxies[0]);
 
     try {
-      const top = await this.fetchTopLinks(page, 250);
+      const top = await this.fetchTopLinks(page, LINKS_TO_PARSE);
       // СРАВНЕНИЕ СКОРОСТИ
       // await this.runBenchmarkWithWorkers(top);
 
@@ -115,8 +115,8 @@ export class CryptoDataScrapperService {
       let links = await this.collectLinks(page);
       links = await this.loadMoreUntil(page, {
         startPage: 2,
-        hardLimit: 2000,
-        maxLinks: 1000, 
+        hardLimit: LINKS_TO_PARSE * 2,
+        maxLinks: LINKS_TO_PARSE, 
         totalCount,
       });
 

@@ -31,3 +31,7 @@ export * from "./common/validation/password.constants";
 
 export * from "./crypto-data-worker/types/crypto-data-worker.types";
 export * from "./crypto-data-worker/constants/crypto-data-worker.constants";
+
+export * from "./indexes-data-worker/indexes-data-worker.pattern";
+
+export * from "./stock-data-worker/stock-data-worker.pattern";

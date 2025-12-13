@@ -46,6 +46,15 @@
         "tsConfigPath": "apps/identity/tsconfig.app.json"
       }
     },
+    "indexes-data-worker": {
+      "type": "application",
+      "root": "apps/indexes-data-worker",
+      "entryFile": "main",
+      "sourceRoot": "apps/indexes-data-worker/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/indexes-data-worker/tsconfig.app.json"
+      }
+    },
     "portfolio-core": {
       "type": "application",
       "root": "apps/portfolio-core",
@@ -53,6 +62,15 @@
       "sourceRoot": "apps/portfolio-core/src",
       "compilerOptions": {
         "tsConfigPath": "apps/portfolio-core/tsconfig.app.json"
+      }
+    },
+    "stock-data-worker": {
+      "type": "application",
+      "root": "apps/stock-data-worker",
+      "entryFile": "main",
+      "sourceRoot": "apps/stock-data-worker/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/stock-data-worker/tsconfig.app.json"
       }
     }
   }

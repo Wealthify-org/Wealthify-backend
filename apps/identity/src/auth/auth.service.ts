@@ -208,7 +208,6 @@ export class AuthService {
       roles: user.dataValues.roles
     }
 
-
     const accessToken = this.jwtService.sign(payload);
 
     const refreshToken = uuidv4()

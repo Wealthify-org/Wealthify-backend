@@ -1,0 +1,1 @@
+export * from "./indexes-data-worker.pattern";

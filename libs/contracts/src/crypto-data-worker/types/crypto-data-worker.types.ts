@@ -30,6 +30,7 @@ export type CryptoData = {
   circulatingSupply: number;
   totalSupply: number;
   maxSupply: number | string; // может быть числом, или знаком бесконечности, или '-'
+  contractAddress?: string | null;
   volume24H: number;
 
   change1HUsdPct: number;
