@@ -30,9 +30,6 @@
       "@identity/*": [
         "apps/identity/src/*"
       ],
-      "@portfolio-core/*": [
-        "apps/portfolio-core/src/*"
-      ],
       "@libs/contracts": [
         "libs/contracts/src"
       ],
@@ -44,6 +41,9 @@
       ],
       "@libs/crypto-data/models/*": [
         "libs/crypto-data/models/*"
+      ],
+      "@portfolio-core/*": [
+        "apps/portfolio-core/src/*"
       ]
     }
   }
