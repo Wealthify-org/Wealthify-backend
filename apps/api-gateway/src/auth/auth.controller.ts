@@ -48,6 +48,10 @@ export class AuthController {
   @Post('refresh')
   async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const refreshToken = req.cookies?.[REFRESH_TOKEN_COOKIE];
+
+    if (!refreshToken) {
+      throw new UnauthorizedException("Refresh token cookie is missing");
+    }
     const { accessToken, refreshToken: nextRefreshToken, user } = await this.auth.refreshTokens(refreshToken);
     setAuthCookies(res, nextRefreshToken);
     res.setHeader('Authorization', `Bearer ${accessToken}`)
