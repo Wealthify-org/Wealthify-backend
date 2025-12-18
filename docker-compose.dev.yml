@@ -1,34 +1,206 @@
-version: '3.9'
-
 services:
-  backend:
+  postgres:
+    image: postgres:16-alpine
+    container_name: wealthify-postgres-dev
+    env_file:
+      - .development.env
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - wealthify-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: wealthify-rabbitmq-dev
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - wealthify-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api-gateway:
+    container_name: wealthify-api-gateway-dev
     build:
       context: .
-      dockerfile: DockerFile.dev
-    container_name: nest-backend-dev
+      dockerfile: Dockerfile.dev
+    env_file:
+      - .development.env
+    environment:
+      - POSTGRES_HOST=postgres
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
+      - NODE_ENV=development
     ports:
-      - "5001:5001"
+      - "${PORT:-5001}:5001"
     volumes:
       - .:/app
       - /app/node_modules
-    env_file:
-      - ./.development.env
-    environment:
-      - NODE_ENV=development
+    command: npm run start:gateway:dev
     depends_on:
-      - db
-    command: npm run start:dev
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - wealthify-network
 
-  db:
-    image: postgres:16
-    container_name: postgres-dev
-    restart: always
+  identity:
+    container_name: wealthify-identity-dev
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
     env_file:
-      - ./.development.env
-    ports:
-      - "5432:5432"
+      - .development.env
+    environment:
+      - POSTGRES_HOST=postgres
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
+      - NODE_ENV=development
     volumes:
-      - pgdata_dev:/var/lib/postgresql/data
+      - .:/app
+      - /app/node_modules
+    command: npm run start:identity:dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - wealthify-network
+
+  assets:
+    container_name: wealthify-assets-dev
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    env_file:
+      - .development.env
+    environment:
+      - POSTGRES_HOST=postgres
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
+      - NODE_ENV=development
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: npm run start:assets:dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - wealthify-network
+
+  portfolio-core:
+    container_name: wealthify-portfolio-core-dev
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    env_file:
+      - .development.env
+    environment:
+      - POSTGRES_HOST=postgres
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
+      - NODE_ENV=development
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: npm run start:portfolio-core:dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - wealthify-network
+
+  crypto-data-worker:
+    container_name: wealthify-crypto-data-worker-dev
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    env_file:
+      - .development.env
+    environment:
+      - POSTGRES_HOST=postgres
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
+      - NODE_ENV=development
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - logos_storage:/app/storage/logos
+    command: npm run start:worker:dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - wealthify-network
+
+  indexes-data-worker:
+    container_name: wealthify-indexes-data-worker-dev
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    env_file:
+      - .development.env
+    environment:
+      - POSTGRES_HOST=postgres
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
+      - NODE_ENV=development
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: npm run start:indexes:dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - wealthify-network
+
+  stock-data-worker:
+    container_name: wealthify-stock-data-worker-dev
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    env_file:
+      - .development.env
+    environment:
+      - POSTGRES_HOST=postgres
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
+      - NODE_ENV=development
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: npm run start:stocks:dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - wealthify-network
 
 volumes:
-  pgdata_dev:
+  postgres_data:
+  rabbitmq_data:
+  logos_storage:
+
+networks:
+  wealthify-network:
+    driver: bridge
