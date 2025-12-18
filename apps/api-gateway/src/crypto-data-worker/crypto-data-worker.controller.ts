@@ -7,6 +7,7 @@ import { SearchAssetsHttpResponse } from "@libs/contracts/crypto-data-worker";
 @Controller('crypto-data-worker')
 export class CryptoDataWorkerController {
   constructor(private readonly cryptoDataWorkerService: CryptoDataWorkerService) {}
+  
   @ApiOperation({ summary: 'Проверка воркера' })
   @ApiResponse({ status: HttpStatus.OK, description: 'OK' })
   @Get('health')
