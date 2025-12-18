@@ -4,8 +4,7 @@
   "sourceRoot": "apps/api-gateway/src",
   "compilerOptions": {
     "deleteOutDir": true,
-    "webpack": true,
-    "tsConfigPath": "apps/wealthify-backend/tsconfig.app.json"
+    "webpack": true
   },
   "monorepo": true,
   "root": "apps/api-gateway",
