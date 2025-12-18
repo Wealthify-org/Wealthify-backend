@@ -9,7 +9,7 @@ async function start() {
       transport: Transport.RMQ,
       options: {
         urls: [process.env.RABBITMQ_URL ?? 'amqp://localhost:5672'],
-        queue: process.env.WORKER_QUEUE ?? 'crypto_data_rpc',
+        queue: process.env.WORKER_QUEUE ?? 'crypto_data_worker_rpc',
         queueOptions: {
           durable: true,
         },

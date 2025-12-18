@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { CryptoDataWorkerController } from './crypto-data-worker.controller';
 import { CryptoDataScrapperService } from './crypto-data-scrapper.service';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -22,17 +22,20 @@ import { RecentSearchesService } from './recent-searches.service';
       envFilePath: `.${process.env.NODE_ENV}.env`,
       isGlobal: true,
     }),
-    SequelizeModule.forRoot({
-          dialect: 'postgres',
-          host: process.env.POSTGRES_HOST,
-          port: Number(process.env.POSTGRES_PORT),
-          username: process.env.POSTGRES_USER,
-          password: process.env.POSTGRES_PASSWORD,
-          database: process.env.POSTGRES_DB,
-          models: [CryptoAssetData, CryptoCandle, CryptoChartsData, Asset, RecentSearch],
-          autoLoadModels: true,
-          synchronize: true, // включи это временно
-          sync: { alter: true }
+    SequelizeModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (cfg: ConfigService) => ({
+        dialect: "postgres",
+        host: cfg.get<string>("POSTGRES_HOST", "localhost"),
+        port: cfg.get<number>("POSTGRES_PORT", 5432),
+        username: cfg.get<string>("POSTGRES_USER", "postgres"),
+        password: cfg.get<string>("POSTGRES_PASSWORD", "root"),
+        database: cfg.get<string>("POSTGRES_DB", "wealthify"),
+        autoLoadModels: true,
+        synchronize: true,
+        sync: { alter: true },
+        models: [/* твои модели */],
+      }),
     }),
     SequelizeModule.forFeature([CryptoAssetData, CryptoCandle, CryptoChartsData, Asset, RecentSearch]),
     CryptoLogosModule,

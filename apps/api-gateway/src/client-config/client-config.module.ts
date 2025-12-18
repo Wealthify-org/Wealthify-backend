@@ -17,7 +17,7 @@ const envSchema = z.object({
   ASSETS_QUEUE: z.string().default('assets_rpc'),
   WORKER_QUEUE: z.string().default('crypto_data_worker_rpc'),
   IDENTITY_QUEUE: z.string().default('identity_rpc'),
-  PORTFOLIO_QUEUE: z.string().default('portfolio_rpc'),
+  PORTFOLIO_QUEUE: z.string().default('portfolio_core_rpc'),
 
   INDEXES_QUEUE: z.string().default('indexes_data_worker_rpc'),
   STOCKS_QUEUE: z.string().default('stocks_data_worker_rpc'),
@@ -27,7 +27,7 @@ const envSchema = z.object({
 @Module({
   imports: [
     ConfigModule.forRoot({
-      isGlobal: false,
+      isGlobal: true,
       validate: (raw) => envSchema.parse(raw)
     }),
   ],
