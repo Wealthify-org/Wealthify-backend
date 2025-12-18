@@ -19,7 +19,7 @@ COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .
 
 # Build the stock-data-worker service
-RUN npm run build stock-data-worker
+RUN npx nest build stock-data-worker
 
 # ==========================================
 # Stage 3: Production

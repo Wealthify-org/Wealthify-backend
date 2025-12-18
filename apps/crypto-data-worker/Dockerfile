@@ -19,7 +19,7 @@ COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .
 
 # Build the crypto-data-worker service
-RUN npm run build crypto-data-worker
+RUN npx nest build crypto-data-worker
 
 # Build worker threads
 RUN npm run build:workers

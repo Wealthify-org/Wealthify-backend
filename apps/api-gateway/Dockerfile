@@ -25,7 +25,7 @@ COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .
 
 # Build the api-gateway application
-RUN npm run build api-gateway
+RUN npx nest build api-gateway
 
 # Build worker threads if needed
 RUN npm run build:workers || true

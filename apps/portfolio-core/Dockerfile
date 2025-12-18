@@ -19,7 +19,7 @@ COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .
 
 # Build the portfolio-core service
-RUN npm run build portfolio-core
+RUN npx nest build portfolio-core
 
 # ==========================================
 # Stage 3: Production

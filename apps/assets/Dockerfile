@@ -19,7 +19,7 @@ COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .
 
 # Build the assets service
-RUN npm run build assets
+RUN npx nest build assets
 
 # ==========================================
 # Stage 3: Production

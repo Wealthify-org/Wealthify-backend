@@ -19,7 +19,7 @@ COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .
 
 # Build the indexes-data-worker service
-RUN npm run build indexes-data-worker
+RUN npx nest build indexes-data-worker
 
 # ==========================================
 # Stage 3: Production

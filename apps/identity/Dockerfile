@@ -19,7 +19,7 @@ COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .
 
 # Build the identity service
-RUN npm run build identity
+RUN npx nest build identity
 
 # ==========================================
 # Stage 3: Production
