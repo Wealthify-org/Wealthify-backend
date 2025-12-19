@@ -2,15 +2,7 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
 import { Asset } from './assets.model';
 import { CreateAssetDto } from  '@libs/contracts';
-// import { PortfolioAssets } from './portfolio-assets.model';
 
-import { AddAssetToPortfolioDto } from  '@libs/contracts';
-// import { Portfolio } from '@app/portfolios/portfolios.model';
-import { SellAssetDto } from  '@libs/contracts';
-import { RemoveAssetFromPortfolioDto } from  '@libs/contracts';
-// import { TransactionsService } from '@app/transactions/transactions.service';
-import { AssetType } from  '@libs/contracts';
-import { TransactionType } from  '@libs/contracts/common/enums/transaction-type.enum';
 import { rpcError } from '@libs/contracts/common';
 import { CryptoAssetData } from '@libs/crypto-data/models';
 

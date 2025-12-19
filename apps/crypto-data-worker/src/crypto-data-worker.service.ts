@@ -59,8 +59,26 @@ export class CryptoDataWorkerService {
       ],
     });
 
+    const items = rows.map((row) => ({
+      id: row.assetId, 
+      name: row.name,
+      ticker: row.ticker,
+      logoUrlLocal: row.logoUrlLocal ?? null,
+      rank: row.rank ?? null,
+      currentPriceUsd: row.currentPriceUsd ?? null,
+      change1HUsdPct: row.change1HUsdPct ?? null,
+      change24HUsdPct: row.change24HUsdPct ?? null,
+      change7DUsdPct: row.change7DUsdPct ?? null,
+      change30DUsdPct: row.change30DUsdPct ?? null,
+      change1YUsdPct: row.change1YUsdPct ?? null,
+      marketCapUsd: row.marketCapUsd ?? null,
+      fdvUsd: row.fdvUsd ?? null,
+      volume24HUsd: row.volume24HUsd ?? null,
+      sparkline7D: row.sparkline7D ?? null,
+    }));
+
     return {
-      items: rows,
+      items: items,
       total: count,
       limit, 
       offset,

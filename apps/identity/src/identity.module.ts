@@ -11,6 +11,8 @@ import { Role } from './roles/roles.model';
 import { UserRoles } from './roles/user-roles.model';
 import { RefreshToken } from './auth/refresh-token.model';
 import { ResetToken } from './auth/reset-token-model';
+import { FavoriteAsset } from './user-activity/favorite-asset.model';
+import { FavoritesModule } from './user-activity/favorites.module';
 
 @Module({
   imports: [
@@ -25,7 +27,7 @@ import { ResetToken } from './auth/reset-token-model';
       username: process.env.POSTGRES_USER,
       password: process.env.POSTGRES_PASSWORD,
       database: process.env.POSTGRES_DB,
-      models: [User, Role, UserRoles, RefreshToken, ResetToken],
+      models: [User, Role, UserRoles, RefreshToken, ResetToken, FavoriteAsset],
       autoLoadModels: true,
       synchronize: true,
       sync: { alter: true },
@@ -33,6 +35,7 @@ import { ResetToken } from './auth/reset-token-model';
     UsersModule,
     AuthModule,
     RolesModule,
+    FavoritesModule
   ],
 })
 export class IdentityModule {}

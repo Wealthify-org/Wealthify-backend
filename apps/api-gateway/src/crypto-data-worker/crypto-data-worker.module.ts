@@ -5,9 +5,11 @@ import { ClientConfigModule } from '@gateway/client-config/client-config.module'
 import { ClientConfigService } from '@gateway/client-config/client-config.service';
 import { CryptoDataWorkerController } from './crypto-data-worker.controller';
 import { CryptoDataWorkerService } from './crypto-data-worker.service';
+import { GatewayAuthModule } from '@gateway/auth/gateway-auth.module';
 
 @Module({
   imports: [
+    GatewayAuthModule,
     ClientConfigModule,
     ClientsModule.registerAsync([
       {

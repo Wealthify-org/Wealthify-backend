@@ -52,6 +52,8 @@ export class CryptoDataWorkerController {
     @Payload() payload: { userId: number; assetId: number },
   ) {
     await this.recentSearchesService.add(payload.userId, payload.assetId);
+
+    return { ok: true };
   }
 
   @MessagePattern(CRYPTO_DATA_WORKER_PATTERNS.REMOVE_RECENT_SEARCH)
@@ -62,10 +64,14 @@ export class CryptoDataWorkerController {
       payload.userId,
       payload.recentId,
     );
+
+    return { ok: true };
   }
 
   @MessagePattern(CRYPTO_DATA_WORKER_PATTERNS.CLEAR_RECENT_SEARCHES)
   async clearRecentSearches(@Payload() payload: { userId: number }) {
     await this.recentSearchesService.clear(payload.userId);
+
+    return { ok: true };
   }
 }

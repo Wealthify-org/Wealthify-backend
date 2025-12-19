@@ -35,3 +35,6 @@ export * from "./crypto-data-worker/constants/crypto-data-worker.constants";
 export * from "./indexes-data-worker/indexes-data-worker.pattern";
 
 export * from "./stock-data-worker/stock-data-worker.pattern";
+
+export * from "./user-activity/user-activity.pattern";
+export * from "./user-activity/dto/favorites.dto";
