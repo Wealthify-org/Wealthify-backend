@@ -1,7 +1,9 @@
-import { Body, Controller, Delete, Get, HttpStatus, Param, Post, Query } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpStatus, Param, Post, Query, UseGuards } from "@nestjs/common";
 import { ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { CryptoDataWorkerService } from "./crypto-data-worker.service";
 import { SearchAssetsHttpResponse } from "@libs/contracts/crypto-data-worker";
+import { JwtAuthGuard } from "@gateway/common/guards/jwt-auth.guard";
+import { CurrentUser } from "@gateway/common/decorators/сurrent-user.decorator";
 
 @ApiTags('Crypto Data Worker')
 @Controller('crypto-data-worker')
@@ -133,13 +135,12 @@ export class CryptoDataWorkerController {
     status: HttpStatus.OK,
     description: "Список недавних поисков",
   })
+  @UseGuards(JwtAuthGuard)
   @Get("search/recent")
   async getRecentSearches(
-    // @CurrentUser() user: CurrentUserPayload,
+    @CurrentUser("id") userId: number,
     @Query("limit") limit?: string,
   ): Promise<SearchAssetsHttpResponse> {
-    // const userId = user.id;
-    const userId = 1; // TODO: заменить на user.id
     return this.cryptoDataWorkerService.getRecentSearches(
       userId,
       limit ? Number(limit) : undefined,
@@ -153,14 +154,12 @@ export class CryptoDataWorkerController {
     status: HttpStatus.NO_CONTENT,
     description: "Запись добавлена",
   })
-
+  @UseGuards(JwtAuthGuard)
   @Post("search/recent")
   async addRecentSearch(
-    // @CurrentUser() user: CurrentUserPayload,
+    @CurrentUser("id") userId: number,
     @Body() body: { assetId: number },
   ): Promise<void> {
-    // const userId = user.id;
-    const userId = 1; // TODO: заменить на user.id
     await this.cryptoDataWorkerService.addRecentSearch(userId, body.assetId);
   }
 
@@ -176,13 +175,12 @@ export class CryptoDataWorkerController {
     status: HttpStatus.NO_CONTENT,
     description: "Запись удалена",
   })
+  @UseGuards(JwtAuthGuard)
   @Delete("search/recent/:id")
   async removeRecentSearch(
-    // @CurrentUser() user: CurrentUserPayload,
+    @CurrentUser("id") userId: number,
     @Param("id") id: string,
   ): Promise<void> {
-    // const userId = user.id;
-    const userId = 1; // TODO: заменить на user.id
     await this.cryptoDataWorkerService.removeRecentSearch(
       userId,
       Number(id),
@@ -196,16 +194,15 @@ export class CryptoDataWorkerController {
     status: HttpStatus.NO_CONTENT,
     description: "Список недавних очищен",
   })
+  @UseGuards(JwtAuthGuard)
   @Delete("search/recent")
   async clearRecentSearches(
-    // @CurrentUser() user: CurrentUserPayload,
+    @CurrentUser("id") userId: number,
   ): Promise<void> {
-    // const userId = user.id;
-    const userId = 1; // TODO: заменить на user.id
     await this.cryptoDataWorkerService.clearRecentSearches(userId);
   }
 
-    @ApiOperation({
+  @ApiOperation({
     summary: 'Получить данные по активу по тикеру',
     description:
       'Возвращает последний снапшот данных по указанному тикеру (цена, капа, изменения, описание и т.д.).',

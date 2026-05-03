@@ -23,6 +23,11 @@ export class PortfoliosController {
     return this.portfolioService.getPortfolioByName(payload.name)
   }
 
+  @MessagePattern(PORTFOLIOS_PATTERNS.FIND_DETAIL_BY_ID)
+  getDetailById(@Payload() payload: { id: number; userId: number }) {
+    return this.portfolioService.getPortfolioDetailById(payload.id, payload.userId)
+  }
+
   @MessagePattern(PORTFOLIOS_PATTERNS.USER_SUMMARY) 
   getUserSummary(@Payload() payload: { userId: number }) {
     return this.portfolioService.getUserSummary(payload.userId);

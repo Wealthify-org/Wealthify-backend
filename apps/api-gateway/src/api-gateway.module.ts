@@ -13,6 +13,7 @@ import { PortfolioAssetsModule } from './portfolio-assets/portfolio-assets.modul
 import { ScheduleModule } from '@nestjs/schedule';
 import { IndexesDataWorkerModule } from './indexes-data-worker/indexes-data-worker.module';
 import { StockDataWorkerModule } from './stock-data-worker/stock-data-worker.module';
+import { FavoritesModule } from './favorites/favorites.module';
 
 @Module({
   imports: [
@@ -29,7 +30,8 @@ import { StockDataWorkerModule } from './stock-data-worker/stock-data-worker.mod
     CryptoDataWorkerModule,
     PortfolioAssetsModule,
     IndexesDataWorkerModule,
-    StockDataWorkerModule
+    StockDataWorkerModule,
+    FavoritesModule
   ],
   controllers: [ApiGatewayController],
   providers: [ApiGatewayService],

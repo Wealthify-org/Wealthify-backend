@@ -61,6 +61,17 @@ export class PortfoliosController {
     return this.portfolios.getUserSummary(userId);
   }
 
+  @Get(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Получить детали портфеля по id с активами и метриками' })
+  @ApiParam({ name: 'id', example: 1, description: 'ID портфеля' })
+  @ApiResponse({ status: 200, description: 'Детали портфеля' })
+  @ApiResponse({ status: 404, description: 'Портфель не найден' })
+  @ApiResponse({ status: 403, description: 'Чужой портфель' })
+  getDetail(@Param('id') id: string, @CurrentUser('id') userId: number) {
+    return this.portfolios.getPortfolioDetailById(Number(id), userId);
+  }
+
   @Delete(':id')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Удалить портфель по ID' })
