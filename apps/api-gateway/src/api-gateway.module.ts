@@ -14,6 +14,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { IndexesDataWorkerModule } from './indexes-data-worker/indexes-data-worker.module';
 import { StockDataWorkerModule } from './stock-data-worker/stock-data-worker.module';
 import { FavoritesModule } from './favorites/favorites.module';
+import { RiskProfileModule } from './risk-profile/risk-profile.module';
 
 @Module({
   imports: [
@@ -31,7 +32,8 @@ import { FavoritesModule } from './favorites/favorites.module';
     PortfolioAssetsModule,
     IndexesDataWorkerModule,
     StockDataWorkerModule,
-    FavoritesModule
+    FavoritesModule,
+    RiskProfileModule,
   ],
   controllers: [ApiGatewayController],
   providers: [ApiGatewayService],

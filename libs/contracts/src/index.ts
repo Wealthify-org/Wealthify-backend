@@ -38,3 +38,7 @@ export * from "./stock-data-worker/stock-data-worker.pattern";
 
 export * from "./user-activity/user-activity.pattern";
 export * from "./user-activity/dto/favorites.dto";
+
+export * from "./risk-profile/risk-profile.pattern";
+export * from "./risk-profile/risk-bucket.enum";
+export * from "./risk-profile/dto/submit-answers.dto";
