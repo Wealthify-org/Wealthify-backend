@@ -16,10 +16,12 @@ import { ASSETS_PATTERNS } from "@libs/contracts/assets/assets.pattern";
 interface AssetWithData {
   id: number;
   ticker: string;
+  name?: string;
   type: AssetType;
   assetData?: {
     currentPriceUsd?: number | null;
     change24HUsdPct?: number | null;
+    logoUrlLocal?: string | null;
   };
 }
 
@@ -161,6 +163,114 @@ export class PortfoliosService {
       valuesUsd,
       change24hAbsUsd,
       change24hPct,
+    };
+  }
+
+  async getPortfolioDetailById(id: number, userId: number) {
+    const portfolio = await this.portfolioRepository.findByPk(id);
+
+    if (!portfolio) {
+      rpcError(
+        HttpStatus.NOT_FOUND,
+        "PORTFOLIO_NOT_FOUND",
+        `Portfolio ${id} not found`,
+      );
+    }
+
+    if (portfolio.userId !== userId) {
+      rpcError(
+        HttpStatus.FORBIDDEN,
+        "PORTFOLIO_FORBIDDEN",
+        `Portfolio ${id} doesn't belong to user ${userId}`,
+      );
+    }
+
+    const rows = await this.portfolioAssetsRepository.findAll({
+      where: { portfolioId: id },
+    });
+
+    const assetIds = Array.from(
+      new Set(rows.map((r) => r.assetId).filter((x): x is number => !!x)),
+    );
+
+    const assetsMap = await this.getAssetsMapByIds(assetIds);
+
+    let totalNow = 0;
+    let total24hAgo = 0;
+    let totalInvested = 0;
+
+    const assets = rows
+      .map((row) => {
+        const asset = assetsMap.get(row.assetId);
+        if (!asset) return null;
+
+        const data = asset.assetData ?? {};
+        const quantity = row.quantity ?? 0;
+        const avgBuy = row.averageBuyPrice ?? 0;
+
+        let priceNow: number;
+        let change24 = 0;
+
+        if (asset.type === AssetType.FIAT && asset.ticker === "USD") {
+          priceNow = 1;
+        } else if (data.currentPriceUsd != null) {
+          priceNow = data.currentPriceUsd;
+          change24 = data.change24HUsdPct ?? 0;
+        } else {
+          return null;
+        }
+
+        const valueNow = quantity * priceNow;
+        const invested = quantity * avgBuy;
+
+        let value24hAgo: number;
+        if (!change24) {
+          value24hAgo = valueNow;
+        } else {
+          const denom = 1 + change24 / 100;
+          value24hAgo = denom <= 0 ? 0 : quantity * (priceNow / denom);
+        }
+
+        totalNow += valueNow;
+        total24hAgo += value24hAgo;
+        totalInvested += invested;
+
+        return {
+          assetId: asset.id,
+          ticker: asset.ticker,
+          name: (asset as any).name ?? asset.ticker,
+          type: asset.type,
+          quantity,
+          averageBuyPrice: avgBuy,
+          currentPriceUsd: priceNow,
+          change24HUsdPct: change24,
+          valueUsd: valueNow,
+          investedUsd: invested,
+          profitUsd: valueNow - invested,
+          profitPct: invested > 0 ? ((valueNow - invested) / invested) * 100 : 0,
+          change24hAbsUsd: valueNow - value24hAgo,
+          logoUrlLocal: (asset as any).assetData?.logoUrlLocal ?? null,
+        };
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null);
+
+    const change24hAbs = totalNow - total24hAgo;
+    const change24hPct = total24hAgo > 0 ? (change24hAbs / total24hAgo) * 100 : 0;
+    const totalProfit = totalNow - totalInvested;
+    const totalProfitPct = totalInvested > 0 ? (totalProfit / totalInvested) * 100 : 0;
+
+    return {
+      id: portfolio.id,
+      name: portfolio.name,
+      type: portfolio.type,
+      userId: portfolio.userId,
+      totalValueUsd: totalNow,
+      totalInvestedUsd: totalInvested,
+      change24hAbsUsd: change24hAbs,
+      change24hPct,
+      totalProfitUsd: totalProfit,
+      totalProfitPct,
+      assets,
     };
   }
 
