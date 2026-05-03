@@ -3,7 +3,7 @@ import { ClientProxy } from '@nestjs/microservices';
 
 import { PORTFOLIO_CLIENT } from "./constant";
 import { PORTFOLIOS_PATTERNS } from '@libs/contracts/portfolios/portfolios.pattern';
-import { CreatePortfolioDto } from '@libs/contracts';
+import { CreatePortfolioDto, RECOMMENDATIONS_PATTERNS } from '@libs/contracts';
 import { sendOrThrow } from '@libs/contracts/common/rpc/client';
 
 @Injectable()
@@ -32,5 +32,15 @@ export class PortfoliosService {
 
   deletePortfolio(id: number) {
     return sendOrThrow(this.appMs, PORTFOLIOS_PATTERNS.DELETE_BY_ID, { id });
+  }
+
+  getRecommendations(portfolioId: number, userId: number) {
+    // увеличиваем таймаут — LLM может отвечать до 25 секунд
+    return sendOrThrow(
+      this.appMs,
+      RECOMMENDATIONS_PATTERNS.GENERATE_FOR_PORTFOLIO,
+      { portfolioId, userId },
+      45_000,
+    );
   }
 }

@@ -42,6 +42,12 @@
       "@libs/crypto-data/models/*": [
         "libs/crypto-data/models/*"
       ],
+      "@libs/openrouter": [
+        "libs/openrouter/src"
+      ],
+      "@libs/openrouter/*": [
+        "libs/openrouter/src/*"
+      ],
       "@portfolio-core/*": [
         "apps/portfolio-core/src/*"
       ]

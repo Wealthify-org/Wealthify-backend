@@ -15,6 +15,8 @@ import { FavoriteAsset } from './user-activity/favorite-asset.model';
 import { FavoritesModule } from './user-activity/favorites.module';
 import { RiskProfile } from './risk-profile/risk-profile.model';
 import { RiskProfileModule } from './risk-profile/risk-profile.module';
+import { ChatMessage } from './chat-history/chat-message.model';
+import { ChatHistoryModule } from './chat-history/chat-history.module';
 
 @Module({
   imports: [
@@ -29,7 +31,7 @@ import { RiskProfileModule } from './risk-profile/risk-profile.module';
       username: process.env.POSTGRES_USER,
       password: process.env.POSTGRES_PASSWORD,
       database: process.env.POSTGRES_DB,
-      models: [User, Role, UserRoles, RefreshToken, ResetToken, FavoriteAsset, RiskProfile],
+      models: [User, Role, UserRoles, RefreshToken, ResetToken, FavoriteAsset, RiskProfile, ChatMessage],
       autoLoadModels: true,
       synchronize: true,
       sync: { alter: true },
@@ -39,6 +41,7 @@ import { RiskProfileModule } from './risk-profile/risk-profile.module';
     RolesModule,
     FavoritesModule,
     RiskProfileModule,
+    ChatHistoryModule,
   ],
 })
 export class IdentityModule {}

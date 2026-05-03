@@ -81,4 +81,22 @@ export class PortfoliosController {
   delete(@Param('id') id: string) {
     return this.portfolios.deletePortfolio(Number(id));
   }
+
+  @Get(':id/recommendations')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({
+    summary: 'Получить персонализированные рекомендации по портфелю',
+    description:
+      'Анализирует структуру портфеля + риск-профиль пользователя через LLM (OpenRouter / Gemma) и возвращает 3–6 actionable-рекомендаций. Если LLM недоступен, возвращается rule-based fallback.',
+  })
+  @ApiParam({ name: 'id', example: 1, description: 'ID портфеля' })
+  @ApiResponse({ status: 200, description: 'Список рекомендаций' })
+  @ApiResponse({ status: 404, description: 'Портфель не найден' })
+  @ApiResponse({ status: 403, description: 'Чужой портфель' })
+  getRecommendations(
+    @Param('id') id: string,
+    @CurrentUser('id') userId: number,
+  ) {
+    return this.portfolios.getRecommendations(Number(id), userId);
+  }
 }

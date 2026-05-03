@@ -15,6 +15,7 @@ import { IndexesDataWorkerModule } from './indexes-data-worker/indexes-data-work
 import { StockDataWorkerModule } from './stock-data-worker/stock-data-worker.module';
 import { FavoritesModule } from './favorites/favorites.module';
 import { RiskProfileModule } from './risk-profile/risk-profile.module';
+import { ChatModule } from './chat/chat.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { RiskProfileModule } from './risk-profile/risk-profile.module';
     StockDataWorkerModule,
     FavoritesModule,
     RiskProfileModule,
+    ChatModule,
   ],
   controllers: [ApiGatewayController],
   providers: [ApiGatewayService],

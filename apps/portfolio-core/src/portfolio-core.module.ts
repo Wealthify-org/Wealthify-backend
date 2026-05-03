@@ -9,6 +9,7 @@ import { PortfolioAssets } from './portfolio-assets/portfolio-assets.model';
 import { PortfoliosModule } from './portfolios/portfolios.module';
 import { TransactionsModule } from './transactions/transactions.module';
 import { PortfolioAssetsModule } from './portfolio-assets/portfolio-assets.module';
+import { RecommendationsModule } from './recommendations/recommendations.module';
 
 @Module({
   imports: [
@@ -29,7 +30,8 @@ import { PortfolioAssetsModule } from './portfolio-assets/portfolio-assets.modul
     }),
     PortfoliosModule,
     TransactionsModule,
-    PortfolioAssetsModule
+    PortfolioAssetsModule,
+    RecommendationsModule,
   ],
 })
 export class PortfolioCoreModule {}

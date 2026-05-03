@@ -42,3 +42,8 @@ export * from "./user-activity/dto/favorites.dto";
 export * from "./risk-profile/risk-profile.pattern";
 export * from "./risk-profile/risk-bucket.enum";
 export * from "./risk-profile/dto/submit-answers.dto";
+
+export * from "./recommendations/recommendations.pattern";
+export * from "./recommendations/dto/recommendation.dto";
+
+export * from "./chat-history/chat-history.pattern";
