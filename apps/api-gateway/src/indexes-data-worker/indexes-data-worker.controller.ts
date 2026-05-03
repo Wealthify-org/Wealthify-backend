@@ -19,9 +19,14 @@ export class IndexesDataWorkerController {
     return this.indexesDataWorkerService.health();
   }
 
-
-  // @Post('parse')
-  // parseAll() {
-  //   return this.indexesDataWorkerService.parseAll();
-  // }
+  @Get('dashboard')
+  @ApiOperation({
+    summary: 'Последний снэпшот рыночных индексов',
+    description:
+      'Агрегированная сводка: Fear & Greed, доминация BTC/ETH, Altseason Index, S&P 500, Gold, капитализации TOTAL/TOTAL2/TOTAL3.',
+  })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Снэпшот получен' })
+  getDashboard() {
+    return this.indexesDataWorkerService.getDashboard();
+  }
 }

@@ -19,7 +19,11 @@ export class IndexesDataWorkerService {
     );
   }
 
-  // parseAll() {
-  //   return sendOrThrow(this.workerMs, INDEXES_DATA_WORKER_PATTERNS.PARSE_ALL, {});
-  // }
+  getDashboard() {
+    return sendOrThrow(
+      this.workerMs,
+      INDEXES_DATA_WORKER_PATTERNS.GET_LATEST_SNAPSHOT,
+      {},
+    );
+  }
 }

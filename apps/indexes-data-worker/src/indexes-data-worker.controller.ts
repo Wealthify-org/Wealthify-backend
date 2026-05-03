@@ -14,8 +14,8 @@ export class IndexesDataWorkerController {
     return this.indexesDataWorkerService.health();
   }
 
-  // @MessagePattern(INDEXES_DATA_WORKER_PATTERNS.PARSE_ALL)
-  // parseAll() {
-  //   return this.indexesDataWorkerService.parseAll();
-  // }
+  @MessagePattern(INDEXES_DATA_WORKER_PATTERNS.GET_LATEST_SNAPSHOT)
+  getLatestSnapshot() {
+    return this.indexesDataWorkerService.getLatestSnapshot();
+  }
 }
