@@ -243,11 +243,28 @@ export class AuthService {
     const expiryDate = new Date()
     expiryDate.setDate(expiryDate.getDate() + 3)
 
-    await this.refreshTokenRepository.upsert({
-      token, 
+    // create, не upsert: userId больше не уникален (multi-device), а
+    // токен — uuid v4, столкновение по `token`-индексу маловероятно. Если
+    // это всё-таки случится — лучше упасть с ошибкой, чем тихо
+    // переписать чужую сессию.
+    await this.refreshTokenRepository.create({
+      token,
       userId,
       expiryDate
     })
+  }
+
+  /**
+   * Раз в день сносим протухшие refresh-токены, чтобы таблица не пухла.
+   * Раньше, с unique:true на userId, упёршись в "максимум 1 запись на
+   * юзера", это было неактуально. Сейчас, когда юзер может насоздавать
+   * множество токенов (multi-device), нужна явная очистка expired.
+   */
+  async sweepExpiredRefreshTokens(): Promise<number> {
+    const deleted = await this.refreshTokenRepository.destroy({
+      where: { expiryDate: { [Op.lt]: new Date() } },
+    });
+    return deleted;
   }
 
   private async validateUser(userDto: LoginDto) {

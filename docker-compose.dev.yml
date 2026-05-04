@@ -4,17 +4,26 @@ services:
     container_name: wealthify-postgres-dev
     env_file:
       - .development.env
+    environment:
+      # переопределяем — внутри docker-сети postgres слушает 5432, host
+      # из .development.env (=localhost) тут неактуален
+      POSTGRES_HOST: postgres
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      # SQL-дамп лежит на уровень выше backend-репо. Postgres-образ при
+      # ПЕРВОМ старте (пустой volume postgres_data) выполнит любой .sql
+      # из /docker-entrypoint-initdb.d/. На повторных запусках не делает
+      # ничего — данные из volume переживают рестарты.
+      - ../wealthify.sql:/docker-entrypoint-initdb.d/init.sql:ro
     networks:
       - wealthify-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d wealthify"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
@@ -30,7 +39,7 @@ services:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
 
   api-gateway:
     container_name: wealthify-api-gateway-dev
@@ -42,12 +51,13 @@ services:
     environment:
       - POSTGRES_HOST=postgres
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
+      - WEB_ORIGIN=http://localhost:3000
       - NODE_ENV=development
     ports:
       - "${PORT:-5001}:5001"
     volumes:
       - .:/app
-      - /app/node_modules
+      - backend_node_modules:/app/node_modules
     command: npm run start:gateway:dev
     depends_on:
       postgres:
@@ -70,7 +80,7 @@ services:
       - NODE_ENV=development
     volumes:
       - .:/app
-      - /app/node_modules
+      - backend_node_modules:/app/node_modules
     command: npm run start:identity:dev
     depends_on:
       postgres:
@@ -93,7 +103,7 @@ services:
       - NODE_ENV=development
     volumes:
       - .:/app
-      - /app/node_modules
+      - backend_node_modules:/app/node_modules
     command: npm run start:assets:dev
     depends_on:
       postgres:
@@ -116,7 +126,7 @@ services:
       - NODE_ENV=development
     volumes:
       - .:/app
-      - /app/node_modules
+      - backend_node_modules:/app/node_modules
     command: npm run start:portfolio-core:dev
     depends_on:
       postgres:
@@ -139,9 +149,10 @@ services:
       - NODE_ENV=development
     volumes:
       - .:/app
-      - /app/node_modules
-      - logos_storage:/app/storage/logos
-    command: npm run start:worker:dev
+      - backend_node_modules:/app/node_modules
+    # Сначала собираем worker-скрипты (bind-mount затирает dist из образа),
+    # затем стартуем сам воркер в watch-режиме
+    command: sh -c "npm run build:workers && npm run start:worker:dev"
     depends_on:
       postgres:
         condition: service_healthy
@@ -163,7 +174,7 @@ services:
       - NODE_ENV=development
     volumes:
       - .:/app
-      - /app/node_modules
+      - backend_node_modules:/app/node_modules
     command: npm run start:indexes:dev
     depends_on:
       postgres:
@@ -186,7 +197,7 @@ services:
       - NODE_ENV=development
     volumes:
       - .:/app
-      - /app/node_modules
+      - backend_node_modules:/app/node_modules
     command: npm run start:stocks:dev
     depends_on:
       postgres:
@@ -196,10 +207,43 @@ services:
     networks:
       - wealthify-network
 
+  # ── Frontend (Next.js dev) ──────────────────────────────────────────────
+  # Контекст билда — соседняя папка wealthify-web/. Bind-mount даёт hot-reload;
+  # анонимный том на node_modules защищает их от затирания bind-mount'ом
+  # (на macOS host-овые node_modules могут быть несовместимы с linux-билдом).
+  # NEXT_PUBLIC_API_URL — куда ходит браузер (хост:порт),
+  # INTERNAL_API_URL  — куда ходит сам Next-server (внутр. имя docker-сети).
+  web:
+    container_name: wealthify-web-dev
+    build:
+      context: ../wealthify-web
+      dockerfile: Dockerfile.dev
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:5001
+      - INTERNAL_API_URL=http://api-gateway:5001
+      - NEXT_TELEMETRY_DISABLED=1
+      # Polling нужен для надёжного file-watching через bind-mount на macOS
+      - WATCHPACK_POLLING=true
+      - CHOKIDAR_USEPOLLING=true
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../wealthify-web:/app
+      - web_node_modules:/app/node_modules
+      - web_next_cache:/app/.next
+    command: npm run dev
+    depends_on:
+      - api-gateway
+    networks:
+      - wealthify-network
+
 volumes:
   postgres_data:
   rabbitmq_data:
-  logos_storage:
+  backend_node_modules:
+  web_node_modules:
+  web_next_cache:
 
 networks:
   wealthify-network:

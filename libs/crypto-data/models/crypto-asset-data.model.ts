@@ -53,8 +53,12 @@ export class CryptoAssetData extends Model<CryptoAssetData, CryptoAssetCreationA
   @Column({ type: DataType.INTEGER, primaryKey: true, autoIncrement: true })
   declare id: number;
 
-  @ApiProperty({ example: 'BTC', description: 'Уникальный тикер' })
-  @Column({ type: DataType.STRING(32), allowNull: false, unique: true })
+  // Раньше ticker был UNIQUE — но у CoinGecko ticker не уникален
+  // (Bitcoin и Mezo Wrapped BTC оба имеют ticker='BTC'). Это приводило
+  // к перезаписи Bitcoin'а wrapped-вариантом при upsert'е. Уникальность
+  // переехала на slug (CoinGecko-ID).
+  @ApiProperty({ example: 'BTC', description: 'Тикер актива (НЕ уникален: bridged/wrapped монеты делят его с оригиналом)' })
+  @Column({ type: DataType.STRING(32), allowNull: false })
   declare ticker: string;
 
   @ApiProperty({ example: 'Bitcoin', description: 'Название актива' })
@@ -65,8 +69,11 @@ export class CryptoAssetData extends Model<CryptoAssetData, CryptoAssetCreationA
   @Column({ type: DataType.TEXT, allowNull: true })
   declare description?: string;
 
-  @ApiProperty({ example: 'bitcoin', description: 'ЧПУ-идентификатор (из источника)', required: false })
-  @Column({ type: DataType.STRING(256), allowNull: true })
+  // CoinGecko slug — единственный устойчивый идентификатор. Используется
+  // как conflict-key при upsert'е. allowNull=true оставлен для legacy-
+  // строк, у которых slug ещё не заполнен (старый парсер не писал его).
+  @ApiProperty({ example: 'bitcoin', description: 'CoinGecko-slug (уникален)', required: false })
+  @Column({ type: DataType.STRING(256), allowNull: true, unique: true })
   declare slug?: string;
 
   @ApiProperty({ example: 'https://assets.coingecko.com/coins/images/1/large.png', required: false })

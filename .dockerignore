@@ -30,8 +30,7 @@ build
 .gitignore
 .gitattributes
 
-# Docker
-Dockerfile*
+# Docker (Dockerfile* НЕ исключаем — BuildKit ищет dockerfile в контексте)
 docker-compose*
 .dockerignore
 

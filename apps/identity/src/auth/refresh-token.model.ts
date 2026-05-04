@@ -20,9 +20,16 @@ export class RefreshToken extends Model<RefreshToken, RefreshTokenCreationAttrs>
   declare token: string
 
 
-  @ApiProperty({example: 5, description: 'Айди пользователя, которому принадлежит токен'})
+  // Раньше userId был UNIQUE — это ломало multi-device/multi-tab:
+  // вход с другого устройства (или просто бутстрап во второй вкладке)
+  // вытеснял refresh-токен первого, и первое устройство тихо
+  // разлогинивалось при следующем refresh. Один пользователь может
+  // иметь много валидных refresh-токенов — устаревшие вычищаются по
+  // expiryDate.
+  @ApiProperty({example: 5, description: 'Айди пользователя (НЕ уникален: много токенов = много устройств/вкладок)'})
   @ForeignKey(() => User)
-  @Column({type: DataType.INTEGER, allowNull: false, unique: true})
+  @Index('refresh_token_user_id_idx')
+  @Column({type: DataType.INTEGER, allowNull: false})
   declare userId: number
 
   @ApiProperty({example: '2025-07-20T14:48:00.000Z', description: 'Дата истечения срока жизни токена'})

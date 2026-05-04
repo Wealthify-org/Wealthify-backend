@@ -205,25 +205,39 @@ export class CryptoDataWorkerService {
 
   async upsertFromCryptoData(payload: CryptoData) {
     const {
+      slug,
       assetName,
       assetTicker,
     } = payload;
 
+    if (!slug) {
+      // защита от мусора: без slug мы не сможем гарантировать identity,
+      // и старая логика по ticker'у уже доказала, что перетирает данные.
+      throw new Error(`upsertFromCryptoData: missing slug for ${assetTicker}`);
+    }
+
     return this.sequelize.transaction(async (t) => {
-      // находим или создаем asset
-      const [asset] = await this.assetRepo.findOrCreate({
-        where: { ticker: assetTicker },
+      // находим или создаем asset ПО SLUG (не по ticker — у обёрток
+      // wrapped/bridged тот же ticker, что у оригинала, и они затирают).
+      const [asset, createdAsset] = await this.assetRepo.findOrCreate({
+        where: { slug },
         defaults: {
           name: assetName,
           ticker: assetTicker,
           type: AssetType.CRYPTO,
+          slug,
         },
         transaction: t,
       });
+      if (!createdAsset) {
+        // legacy-строки могли быть созданы без slug — обновляем поля и slug
+        asset.set({ name: assetName, ticker: assetTicker, slug });
+        await asset.save({ transaction: t });
+      }
 
-      // находим или создаем cryptoAssetData по тикеру
+      // crypto-снапшот тоже идентифицируем по slug
       const [assetData, createdAssetData] = await this.cryptoAssetRepo.findOrCreate({
-        where: { ticker: assetTicker },
+        where: { slug },
         defaults: {
           ...this.mapCryptoDataToAssetData(payload),
           assetId: asset.id,
@@ -305,7 +319,9 @@ export class CryptoDataWorkerService {
       change1YUsdPct: data.change1YUsdPct ?? undefined,
 
       sparkline7D: data.sparkline7D,
-      slug: 'coingecko',
+      // Раньше тут был хардкод 'coingecko' — поэтому колонка slug
+      // не использовалась. Теперь пишем реальный slug из URL парсера.
+      slug: data.slug,
       lastUpdatedAt: new Date(),
     };
   }

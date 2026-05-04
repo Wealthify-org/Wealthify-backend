@@ -20,6 +20,10 @@ export type CandlesByRange = Partial<Record<RangeKey, Candle[]>>;
 
 
 export type CryptoData = {
+  // Уникальный идентификатор монеты с CoinGecko (например `bitcoin`,
+  // `mezo-wrapped-bitcoin`). Используется как conflict-key при upsert'е,
+  // потому что ticker не уникален: у Bitcoin и его обёрток одинаковый BTC.
+  slug: string;
   assetName: string;
   assetTicker: string;
   currentAssetRank: number;
@@ -51,4 +55,5 @@ export type CryptoData = {
   source: string;
 };
 
-export type ExtractedCoinFields = Omit<CryptoData, 'charts' | 'candles' | 'source'>;
+// slug извлекается из URL в parseCoin, не в page.evaluate
+export type ExtractedCoinFields = Omit<CryptoData, 'charts' | 'candles' | 'source' | 'slug'>;

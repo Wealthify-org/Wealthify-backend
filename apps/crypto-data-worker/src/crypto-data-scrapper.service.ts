@@ -93,7 +93,7 @@ export class CryptoDataScrapperService implements OnApplicationShutdown {
     this.activeWorkers.clear();
   }
 
-  @Cron(CronExpression.EVERY_10_SECONDS)
+  // @Cron(CronExpression.EVERY_10_SECONDS)
   async collectAllAssetsDataCron() {
     if (this.isRunning) {
       this.log.warn('Previous collectAllAssets run is still in progress, skipping this tick');

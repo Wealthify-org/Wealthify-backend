@@ -7,6 +7,7 @@ interface WorkerAssetCreationAttrs {
   name: string;
   ticker: string;
   type: AssetType;
+  slug?: string | null;
 }
 
 @Table({ tableName: 'assets' }) // та же таблица, что и в app
@@ -15,13 +16,23 @@ export class Asset extends Model<Asset, WorkerAssetCreationAttrs> {
   @Column({ type: DataType.INTEGER, primaryKey: true, autoIncrement: true })
   declare id: number;
 
+  // name/ticker раньше были UNIQUE — но это ломалось на crypto, где
+  // у обёрток (Mezo Wrapped BTC) тот же ticker, что у оригинала (BTC).
+  // Уникальность переехала на slug.
   @ApiProperty({ example: 'Bitcoin', description: 'Полное название актива' })
-  @Column({ type: DataType.STRING, unique: true, allowNull: false })
+  @Column({ type: DataType.STRING, allowNull: false })
   declare name: string;
 
-  @ApiProperty({ example: 'BTC', description: 'Тикер актива' })
-  @Column({ type: DataType.STRING, unique: true, allowNull: false })
+  @ApiProperty({ example: 'BTC', description: 'Тикер актива (НЕ уникален для crypto-обёрток)' })
+  @Column({ type: DataType.STRING, allowNull: false })
   declare ticker: string;
+
+  // CoinGecko slug — уникальный ID. Заполняется только парсером для
+  // crypto. Для stocks/bonds остаётся NULL (PG позволяет много NULL
+  // в unique-индексе).
+  @ApiProperty({ example: 'bitcoin', description: 'CoinGecko-slug (для crypto, уникален)', required: false })
+  @Column({ type: DataType.STRING, allowNull: true, unique: true })
+  declare slug?: string | null;
 
   @ApiProperty({ example: 'Crypto', enum: AssetType })
   @Column({ type: DataType.ENUM(...Object.values(AssetType)), allowNull: false })

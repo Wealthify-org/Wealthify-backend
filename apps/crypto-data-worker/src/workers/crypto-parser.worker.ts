@@ -146,6 +146,15 @@ async function parseCoinWithRetry(page: Page, link: string, attempts = 2): Promi
 
 
 const parseCoin = async (page, link: string): Promise<CryptoData> => {
+    // slug — единственный устойчивый идентификатор монеты в CoinGecko.
+    // URL вида https://www.coingecko.com/en/coins/<slug> → достаём slug.
+    // Без него upsert по тикеру вешает разные монеты на один row (Bitcoin
+    // перетирался Mezo Wrapped BTC, потому что у обоих ticker=BTC).
+    const slug = getCoinSlugFromUrl(link);
+    if (!slug) {
+      throw new Error(`Cannot extract coingecko slug from URL: ${link}`);
+    }
+
     await page.goto(link, {
       waitUntil: 'domcontentloaded',        // быстрее, чем full load
       timeout: NAVIGATION_TIMEOUT,          // 60 сек
@@ -157,6 +166,13 @@ const parseCoin = async (page, link: string): Promise<CryptoData> => {
     const fields = await page.evaluate(extractCoinDataInPageContext);
     if (!fields) {
       throw new Error('Failed to extract coin fields from page');
+    }
+    // fail-fast: если rank не извлёкся (виджет соседних монет в DOM
+    // подсунул чужой `#N`, или не было бейджа вовсе) — значение 0 уйдёт
+    // в БД и затрёт корректный ранк предыдущего прогона. Лучше отвалиться
+    // с ошибкой и дать parseCoinWithRetry перезапросить страницу.
+    if (!fields.currentAssetRank || fields.currentAssetRank <= 0) {
+      throw new Error(`Failed to extract rank for ${slug} (got ${fields.currentAssetRank})`);
     }
 
     const chartByRange: Partial<Record<RangeKey, ChartPayload>> = {};
@@ -180,6 +196,7 @@ const parseCoin = async (page, link: string): Promise<CryptoData> => {
     };
 
     return {
+      slug,
       ...fields,
       sparkline7D: extractSparklineFromCharts(charts.d7?.stats),
       charts,
@@ -437,11 +454,31 @@ function extractCoinDataInPageContext(): ExtractedCoinFields | null {
     if (m) assetTicker = m[1];
   }
 
+  // Раньше регэкс /^#\d+/ проходил по ВСЕМ <div>/<span> страницы и
+  // ловил первый попавшийся бейдж — а у CoinGecko есть виджет
+  // «Top related coins» с рангами других монет. Из-за этого FIGR_HELOC
+  // получал rank=9 от STETH, BSC-USD получал rank=19 от LINK и т.п.
+  // Скоупим поиск к header-региону рядом с h1 (рангом монеты этой страницы).
   let currentAssetRank = 0;
-  const maybeRank = Array.from(document.querySelectorAll('div,span'))
-    .map((e) => toText(e))
-    .find((t) => /^#\s*\d+/.test(t));
-  if (maybeRank) currentAssetRank = parseInt(maybeRank.replace(/[^\d]/g, ''), 10) || 0;
+  const h1El = document.querySelector('h1');
+  const headerScope =
+    (h1El?.closest('[data-controller~="coin-show"]') as HTMLElement | null) ||
+    (h1El?.closest('main, section, header') as HTMLElement | null) ||
+    (h1El?.parentElement as HTMLElement | null) ||
+    document.body;
+  const rankCandidates = Array.from(headerScope.querySelectorAll('div, span'));
+  for (const el of rankCandidates) {
+    const t = toText(el);
+    // строгий якорь: только короткие "#N" текстом (не "#9. Some other..")
+    const m = t.match(/^#\s*(\d+)\s*$/);
+    if (m) {
+      const n = parseInt(m[1], 10);
+      if (n > 0) {
+        currentAssetRank = n;
+        break;
+      }
+    }
+  }
 
   const priceEl = document.querySelector(
     'span[data-price-target="price"][data-converter-target="price"]'

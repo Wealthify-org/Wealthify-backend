@@ -474,8 +474,13 @@ export class CryptoDataFetcherService {
 
     // source — ссылка на страницу монеты на CoinGecko
     const source = `https://www.coingecko.com/en/coins/${market.id}`;
+    // CoinGecko `id` (например 'bitcoin') = тот же slug, который мы используем
+    // как conflict-key при upsert'е. Без него Bitcoin будет перетёрт Mezo
+    // Wrapped BTC (у обоих ticker=BTC).
+    const slug = market.id;
 
     return {
+      slug,
       assetName,
       assetTicker,
       currentAssetRank,
