@@ -22,11 +22,44 @@ import {
 } from "./observations";
 import { IDENTITY_CLIENT } from "./constants";
 
+type Lang = "ru" | "en";
+
 interface LlmRecommendationsPayload {
   recommendations: RecommendationDto[];
 }
 
-const LLM_SCHEMA: OpenRouterJsonSchema = {
+const SCHEMA_DESCRIPTIONS: Record<
+  Lang,
+  {
+    level: string;
+    title: string;
+    description: string;
+    action: string;
+  }
+> = {
+  ru: {
+    level:
+      "Уровень: warning — только для серьёзных системных рисков (≥80% капитала в одном активе, полное отсутствие стейблов у консервативного профиля). info — обычное наблюдение или мягкая идея для размышления (используй по умолчанию). positive — портфель близок к целевой структуре.",
+    title:
+      "Описательный заголовок 5–9 слов, без алармистских эпитетов (никаких «критическая», «срочно»). Без точки на конце. Без markdown. Пример: «Высокая доля BTC в портфеле», а не «Критическая концентрация капитала в одном активе».",
+    description:
+      "1–3 предложения, мягким тоном наблюдения, не приговора. Сначала описывай факт, потом — что это может значить. Используй «можно подумать о», «стоит обратить внимание», «было бы полезно», а не «это противоречит» / «критически важно». Допустим markdown: **жирный** для ключевых терминов и `инлайн-код` для тикеров/метрик.",
+    action:
+      "Опциональная мягкая идея для размышления, не приказ. Используй формы: «Можно рассмотреть...», «Полезно было бы...», «Стоит подумать о...», «Один из вариантов — ...». Никаких «Приведите», «Выделите», «Сформируйте». Допустим markdown.",
+  },
+  en: {
+    level:
+      "Level: warning — only for serious systemic risks (≥80% of capital in a single asset, complete lack of stables for a conservative profile). info — a regular observation or a soft idea to consider (use this by default). positive — portfolio is close to the target structure.",
+    title:
+      "Descriptive title in 5–9 words, no alarmist adjectives (no 'critical', 'urgent'). No period at the end. No markdown. Example: 'High share of BTC in portfolio' — not 'Critical capital concentration in a single asset'.",
+    description:
+      "1–3 sentences, in a soft observational tone — not a verdict. State the fact first, then what it might mean. Prefer phrasings like 'you might want to look at', 'it could be worth considering', 'one thing to keep in mind' — avoid 'this violates', 'critically important'. Markdown allowed: **bold** for key terms and `inline code` for tickers/metrics.",
+    action:
+      "An optional soft suggestion to consider, not an order. Use forms like: 'You could consider...', 'It might be worth...', 'One option would be...', 'Worth thinking about...'. Avoid imperatives like 'Bring', 'Allocate', 'Set up'. Markdown allowed.",
+  },
+};
+
+const buildLlmSchema = (lang: Lang): OpenRouterJsonSchema => ({
   name: "portfolio_recommendations",
   strict: true,
   schema: {
@@ -46,29 +79,26 @@ const LLM_SCHEMA: OpenRouterJsonSchema = {
             level: {
               type: "string",
               enum: ["warning", "info", "positive"],
-              description:
-                "Уровень: warning — есть риск, info — наблюдение, positive — хорошее состояние.",
+              description: SCHEMA_DESCRIPTIONS[lang].level,
             },
             title: {
               type: "string",
-              description: "Короткий заголовок (5–10 слов), без точки в конце.",
+              description: SCHEMA_DESCRIPTIONS[lang].title,
             },
             description: {
               type: "string",
-              description:
-                "Развёрнутое объяснение в 1–3 предложениях, на русском, без воды.",
+              description: SCHEMA_DESCRIPTIONS[lang].description,
             },
             action: {
               type: "string",
-              description:
-                "Конкретное действие, которое стоит сделать (опционально).",
+              description: SCHEMA_DESCRIPTIONS[lang].action,
             },
           },
         },
       },
     },
   },
-};
+});
 
 /**
  * SYSTEM PROMPT построен по best-practice финансового advisor'а:
@@ -79,33 +109,56 @@ const LLM_SCHEMA: OpenRouterJsonSchema = {
  *  - Структурированный thinking pattern: assess → diagnose → propose
  *  - Чёткая шкала уровней с пороговыми правилами
  */
-const SYSTEM_PROMPT = `Ты — аналитик криптовалютных портфелей и помощник пользователя, помогающий ему \
-улучшить структуру его портфеля. Ты не лицензированный финансовый советник — \
-твои рекомендации носят АНАЛИТИКО-ОБРАЗОВАТЕЛЬНЫЙ характер. Ты помогаешь увидеть риски и \
-disbalance, но не даёшь индивидуальных торговых указаний.
+const SYSTEM_PROMPT_RU = `Ты — аналитик криптовалютных портфелей и помощник пользователя, помогающий ему \
+лучше понимать структуру своего портфеля. Ты не лицензированный финансовый советник — \
+твои рекомендации носят АНАЛИТИКО-ОБРАЗОВАТЕЛЬНЫЙ характер. Ты помогаешь УВИДЕТЬ нюансы \
+и предлагаешь идеи для размышления, но НЕ даёшь индивидуальных торговых указаний \
+и не давишь на пользователя.
 
 # Кому ты помогаешь
 Пользователю Wealthify — частному криптоинвестору. Он прошёл (или нет) тест риск-профиля; \
-ты получаешь его ЦЕЛЕВУЮ АЛЛОКАЦИЮ как ориентир, к которому стоит стремиться.
+ты получаешь его ЦЕЛЕВУЮ АЛЛОКАЦИЮ как ориентир, к которому он МОЖЕТ стремиться.
 
 # Что от тебя нужно
-Сформируй 3–6 персональных рекомендаций по оптимизации структуры портфеля.
-Каждая должна давать пользователю КОНКРЕТНУЮ новую ценность — без воды, без banalité.
+Сформируй 3–6 персональных мягких наблюдений и идей по структуре портфеля.
+Каждая должна давать конкретную пользу — без воды, без banalité, но без давления и \
+алармизма.
 
-# Структура мышления (применяй к каждой рекомендации)
-1. ASSESS — какой факт ты увидел в данных портфеля или наблюдениях
-2. DIAGNOSE — почему это важно, какой риск или возможность
-3. PROPOSE — что предлагается сделать (по возможности — измеримое действие)
+# Стиль мышления (применяй к каждой рекомендации)
+1. ASSESS — что ты заметил в данных
+2. CONTEXTUALIZE — почему это интересно учесть (без катастрофизма)
+3. SUGGEST — мягкая идея для размышления, которую пользователь может рассмотреть
 
-# Уровни (level) — чёткие пороги
-- "warning" — реальный риск: концентрация ≥50% в одном активе, существенное \
-нарушение целевой аллокации (drift ≥25 п.п.), нехватка стейблкоинов у консервативного \
-профиля, чрезмерная доля мелких альтов у не-спекулятивного профиля.
-- "info"    — наблюдение / опциональное действие: drift 10–25 п.п., возможность \
-перебалансировки, недостаточная диверсификация (3–4 актива).
+# Уровни (level) — раздавай ОЧЕНЬ экономно
+- "warning" — ТОЛЬКО для системных рисков, где портфель действительно уязвим: \
+≥80% капитала в одном активе, полное отсутствие стейблов у консервативного профиля. \
+Это РЕДКИЙ уровень — большинство наблюдений должны быть "info", не "warning".
+- "info" — ИСПОЛЬЗУЙ ПО УМОЛЧАНИЮ. Любое наблюдение, идея, мягкая мысль о \
+ребалансировке, drift в 20–60 п.п., недостаточная диверсификация (3–4 актива), \
+заметная доля мелких альтов — всё это "info".
 - "positive" — портфель в хорошей форме по этой метрике (близок к целевой структуре).
 
-# Правила, которые нельзя нарушать
+Если сомневаешься между warning и info — выбирай info.
+
+# Правила тона (КРИТИЧНО)
+- НЕ используй слова: «критическая», «критически важно», «срочно», «обязательно \
+нужно», «противоречит принципам», «нарушает», «недопустимо», «опасно».
+- Заголовки — описательные, не алармистские: \
+✓ «Высокая доля BTC в портфеле» \
+✗ «Критическая концентрация капитала в одном активе» \
+✓ «Нет стейблкоинов в портфеле» \
+✗ «Отсутствие защитного слоя в стейблкоинах»
+- Описание — мягкое, наблюдательное: \
+✓ «Сейчас 100% портфеля приходится на BTC. Это означает, что динамика портфеля \
+полностью повторяет движение одного актива.» \
+✗ «100% портфеля сосредоточено в BTC, что создаёт риск полной зависимости...»
+- Действие (action) — МЯГКАЯ ИДЕЯ, не приказ: \
+✓ «Можно рассмотреть постепенное добавление ETH и крупных альтов до целевых уровней» \
+✓ «Полезно было бы выделить часть капитала в стейблы — это даст запас на просадках» \
+✗ «Приведите долю BTC к целевым 30%» \
+✗ «Выделите 10% в стейблкоины»
+
+# Правила фактов (тоже нельзя нарушать)
 - Опирайся ТОЛЬКО на факты из данных, не выдумывай чисел и фактов.
 - Не давай прогнозов цен, не используй фразы вида «будет расти», «обвалится», «купите по $X».
 - Не упоминай конкретные ценовые таргеты как guaranteed.
@@ -113,14 +166,89 @@ disbalance, но не даёшь индивидуальных торговых �
 - Пиши на русском, кратко и по делу.
 - Заголовок: 5–9 слов, без точки на конце.
 - Описание: 1–3 предложения, без воды.
-- Если есть конкретный шаг — добавь его в поле "action" (≤200 символов).
-- Если у пользователя нет риск-профиля — обязательно одной из рекомендаций \
-порекомендуй пройти тест и объясни, почему это улучшит советы.
+- Если есть мягкая идея для размышления — добавь её в поле "action" (≤200 символов).
+- Если у пользователя нет риск-профиля — мягко предложи пройти тест в одной из \
+рекомендаций и объясни, чем это будет полезно.
 - Не повторяй одну и ту же мысль в нескольких рекомендациях.
 
 # Тон
-Уверенный, спокойный, профессиональный. Как у грамотного аналитика, который \
-заботится о капитале пользователя, а не пытается его впечатлить.`;
+Спокойный, доброжелательный, профессиональный. Как у грамотного аналитика, который \
+делится наблюдениями и идеями, а не выписывает рецепты. Никакого давления.
+
+# Язык
+Все title/description/action — ТОЛЬКО на русском.`;
+
+const SYSTEM_PROMPT_EN = `You are a crypto-portfolio analyst helping the user better UNDERSTAND the structure \
+of their portfolio. You are NOT a licensed financial advisor — your recommendations are \
+ANALYTICAL and EDUCATIONAL. You help the user SEE nuances and offer ideas worth considering, \
+but you DO NOT issue trading instructions and never pressure the user.
+
+# Who you help
+A Wealthify user — a retail crypto investor. They have (or have not) taken the risk-profile test; \
+you receive their TARGET ALLOCATION as a guideline they CAN aim for.
+
+# What you must produce
+3–6 personalized soft observations and ideas about the portfolio structure.
+Each must give concrete value — no fluff, no banalities, no pressure or alarmism.
+
+# Thinking pattern (apply to each recommendation)
+1. ASSESS — what you noticed in the data
+2. CONTEXTUALIZE — why it's interesting to keep in mind (without catastrophizing)
+3. SUGGEST — a soft idea the user might consider
+
+# Levels (level) — assign VERY sparingly
+- "warning" — ONLY for systemic risks where the portfolio is genuinely fragile: \
+≥80% of capital in a single asset, complete absence of stables for a conservative profile. \
+This is a RARE level — most observations should be "info", not "warning".
+- "info" — USE THIS BY DEFAULT. Any observation, idea, soft thought about rebalancing, \
+drift of 20–60 pp, insufficient diversification (3–4 assets), notable small-alts share — \
+all of these are "info".
+- "positive" — portfolio is in good shape on this metric (close to target structure).
+
+When in doubt between warning and info — pick info.
+
+# Tone rules (CRITICAL)
+- DO NOT use words like: "critical", "critically important", "urgent", "must", \
+"violates principles", "breaches", "unacceptable", "dangerous".
+- Titles — descriptive, not alarmist: \
+✓ "High share of BTC in portfolio" \
+✗ "Critical capital concentration in a single asset" \
+✓ "No stablecoins in portfolio" \
+✗ "Absence of a defensive stablecoin layer"
+- Description — soft, observational: \
+✓ "Right now 100% of the portfolio sits in BTC. That means the portfolio's performance \
+fully tracks one asset's movement." \
+✗ "100% of the portfolio is concentrated in BTC, which creates a risk of full dependence..."
+- Action — A SOFT SUGGESTION, not an order: \
+✓ "You could consider gradually adding ETH and large alts up to your target levels" \
+✓ "It might be worth allocating part of the capital to stables for a buffer on drawdowns" \
+✗ "Bring BTC down to the target 30%" \
+✗ "Allocate 10% to stablecoins"
+
+# Fact rules (also must not be broken)
+- Rely ONLY on facts from the data, do not invent numbers or facts.
+- Don't make price predictions, don't use phrases like "will go up", "will crash", "buy at $X".
+- Don't mention specific price targets as guarantees.
+- Don't use marketing or hype tone ("to the moon", "rocket", "gem").
+- Write in English, briefly and to the point.
+- Title: 5–9 words, no period at the end.
+- Description: 1–3 sentences, no fluff.
+- If there's a soft idea worth considering — put it in the "action" field (≤200 characters).
+- If the user has no risk profile — gently suggest taking the test in one of the recommendations \
+and explain how it would help.
+- Don't repeat the same point in multiple recommendations.
+
+# Tone
+Calm, friendly, professional. Like a thoughtful analyst sharing observations and ideas, \
+not someone writing prescriptions. No pressure.
+
+# Language
+All title/description/action — ENGLISH ONLY.`;
+
+const SYSTEM_PROMPT: Record<Lang, string> = {
+  ru: SYSTEM_PROMPT_RU,
+  en: SYSTEM_PROMPT_EN,
+};
 
 @Injectable()
 export class RecommendationsService {
@@ -138,6 +266,7 @@ export class RecommendationsService {
   async generateForPortfolio(
     portfolioId: number,
     userId: number,
+    lang: Lang = "ru",
   ): Promise<RecommendationsResultDto> {
     // 1) загрузим портфель и риск-профиль параллельно
     const [portfolioRaw, riskRaw] = await Promise.all([
@@ -185,7 +314,7 @@ export class RecommendationsService {
     let source: RecommendationsResultDto["source"] = "llm";
 
     try {
-      recommendations = await this.callLlm(portfolio, risk, actualAllocation, observations);
+      recommendations = await this.callLlm(portfolio, risk, actualAllocation, observations, lang);
       this.logger.log(
         `Recommendations generated via LLM for portfolio=${portfolioId} user=${userId} (${recommendations.length} items)`,
       );
@@ -239,18 +368,20 @@ export class RecommendationsService {
     risk: RiskProfileSnapshot | null,
     actualAllocation: ReturnType<typeof buildObservations>["actualAllocation"],
     observations: ReturnType<typeof buildObservations>["observations"],
+    lang: Lang,
   ): Promise<RecommendationDto[]> {
     const userPrompt = this.buildUserPrompt(
       portfolio,
       risk,
       actualAllocation,
       observations,
+      lang,
     );
 
     const { data } = await this.openRouter.chatStructured<LlmRecommendationsPayload>(
-      LLM_SCHEMA,
+      buildLlmSchema(lang),
       {
-        system: SYSTEM_PROMPT,
+        system: SYSTEM_PROMPT[lang],
         user: userPrompt,
         // низкая температура → стабильная структура и тон,
         // плюс одинаковые входы → одинаковые выходы → cache hit ratio выше
@@ -291,6 +422,7 @@ export class RecommendationsService {
     risk: RiskProfileSnapshot | null,
     actual: ReturnType<typeof buildObservations>["actualAllocation"],
     observations: ReturnType<typeof buildObservations>["observations"],
+    lang: Lang,
   ): string {
     /**
      * Все числа округлены ДО ЦЕЛЫХ для percent-полей и до 1 знака для денег
@@ -298,16 +430,17 @@ export class RecommendationsService {
      * через минуту) НЕ ломал OpenRouter response cache. Кеш хитится только
      * при идентичном body, поэтому стабильное представление даёт больший hit-rate.
      */
+    const L = USER_PROMPT_LABELS[lang];
     const lines: string[] = [];
     const round0 = (v: number) => Math.round(v);
     const round1 = (v: number) => Math.round(v * 10) / 10;
 
     // ── портфель — компактно ─────────────────────────────────────────────
-    lines.push("## Портфель");
+    lines.push(L.portfolioHeader);
     lines.push(
-      `Стоимость $${round0(portfolio.totalValueUsd)} (вложено $${round0(portfolio.totalInvestedUsd)}). ` +
-        `Доходность ${round1(portfolio.totalProfitPct)}%, 24ч ${round1(portfolio.change24hPct)}%. ` +
-        `Активов: ${portfolio.assets.length}.`,
+      `${L.value} $${round0(portfolio.totalValueUsd)} (${L.invested} $${round0(portfolio.totalInvestedUsd)}). ` +
+        `${L.return} ${round1(portfolio.totalProfitPct)}%, ${L.h24} ${round1(portfolio.change24hPct)}%. ` +
+        `${L.assets}: ${portfolio.assets.length}.`,
     );
 
     // ── активы — топ-10 в одну строку каждый ─────────────────────────────
@@ -316,20 +449,20 @@ export class RecommendationsService {
       .slice(0, 10);
     if (top.length) {
       lines.push("");
-      lines.push("## Активы (топ-10 по стоимости)");
+      lines.push(L.topAssetsHeader);
       for (const a of top) {
         const sharePct = portfolio.totalValueUsd > 0
           ? (a.valueUsd / portfolio.totalValueUsd) * 100
           : 0;
         lines.push(
-          `- ${a.ticker} | ${round0(sharePct)}% портфеля | total ${round0(a.profitPct)}% | 24ч ${round0(a.change24HUsdPct)}%`,
+          `- ${a.ticker} | ${round0(sharePct)}% ${L.ofPortfolio} | total ${round0(a.profitPct)}% | ${L.h24} ${round0(a.change24HUsdPct)}%`,
         );
       }
     }
 
     // ── текущая категорийная аллокация ───────────────────────────────────
     lines.push("");
-    lines.push("## Категории (% от портфеля сейчас)");
+    lines.push(L.categoriesHeader);
     lines.push(
       `stables ${round0(actual.stables)} | BTC ${round0(actual.btc)} | ETH ${round0(actual.eth)} | largeAlts ${round0(actual.largeAlts)} | smallAlts ${round0(actual.smallAlts)}`,
     );
@@ -338,24 +471,22 @@ export class RecommendationsService {
     lines.push("");
     if (risk) {
       const t = risk.targetAllocation;
-      lines.push("## Риск-профиль пользователя");
+      lines.push(L.riskHeader);
       lines.push(
-        `${risk.bucket} (${risk.bucketTitle}). Допустимая просадка ~${risk.acceptableDrawdownPct}%.`,
+        `${risk.bucket} (${risk.bucketTitle}). ${L.acceptableDrawdown} ~${risk.acceptableDrawdownPct}%.`,
       );
       lines.push(
-        `Целевая аллокация: stables ${t.stables} | BTC ${t.btc} | ETH ${t.eth} | largeAlts ${t.largeAlts} | smallAlts ${t.smallAlts}`,
+        `${L.targetAllocation}: stables ${t.stables} | BTC ${t.btc} | ETH ${t.eth} | largeAlts ${t.largeAlts} | smallAlts ${t.smallAlts}`,
       );
     } else {
-      lines.push("## Риск-профиль");
-      lines.push(
-        "Тест не пройден. Обязательно одной из рекомендаций предложи пройти тест и объясни ценность.",
-      );
+      lines.push(L.riskHeader);
+      lines.push(L.riskNotTaken);
     }
 
     // ── rule-based наблюдения как контекст ───────────────────────────────
     if (observations.length) {
       lines.push("");
-      lines.push("## Что заметили правила (severity 1=критично, 3=наблюдение)");
+      lines.push(L.observationsHeader);
       for (const o of observations) {
         lines.push(`- [s${o.severity}] ${o.fact}`);
       }
@@ -363,12 +494,74 @@ export class RecommendationsService {
 
     // ── финальная инструкция ─────────────────────────────────────────────
     lines.push("");
-    lines.push(
-      "Сформируй 3–6 рекомендаций по схеме (level/title/description/action). " +
-        "Покрой ВСЕ серьёзные наблюдения (severity 1–2) хотя бы одной рекомендацией. " +
-        "Не повторяйся, пиши кратко и по делу.",
-    );
+    lines.push(L.finalInstruction);
 
     return lines.join("\n");
   }
 }
+
+const USER_PROMPT_LABELS: Record<
+  Lang,
+  {
+    portfolioHeader: string;
+    value: string;
+    invested: string;
+    return: string;
+    h24: string;
+    assets: string;
+    topAssetsHeader: string;
+    ofPortfolio: string;
+    categoriesHeader: string;
+    riskHeader: string;
+    acceptableDrawdown: string;
+    targetAllocation: string;
+    riskNotTaken: string;
+    observationsHeader: string;
+    finalInstruction: string;
+  }
+> = {
+  ru: {
+    portfolioHeader: "## Портфель",
+    value: "Стоимость",
+    invested: "вложено",
+    return: "Доходность",
+    h24: "24ч",
+    assets: "Активов",
+    topAssetsHeader: "## Активы (топ-10 по стоимости)",
+    ofPortfolio: "портфеля",
+    categoriesHeader: "## Категории (% от портфеля сейчас)",
+    riskHeader: "## Риск-профиль пользователя",
+    acceptableDrawdown: "Допустимая просадка",
+    targetAllocation: "Целевая аллокация",
+    riskNotTaken:
+      "Тест не пройден. Обязательно одной из рекомендаций предложи пройти тест и объясни ценность.",
+    observationsHeader:
+      "## Что заметили правила (severity 1=критично, 3=наблюдение)",
+    finalInstruction:
+      "Сформируй 3–6 рекомендаций по схеме (level/title/description/action). " +
+      "Покрой ВСЕ серьёзные наблюдения (severity 1–2) хотя бы одной рекомендацией. " +
+      "Не повторяйся, пиши кратко и по делу.",
+  },
+  en: {
+    portfolioHeader: "## Portfolio",
+    value: "Value",
+    invested: "invested",
+    return: "Return",
+    h24: "24h",
+    assets: "Assets",
+    topAssetsHeader: "## Assets (top-10 by value)",
+    ofPortfolio: "of portfolio",
+    categoriesHeader: "## Categories (% of portfolio right now)",
+    riskHeader: "## User risk profile",
+    acceptableDrawdown: "Acceptable drawdown",
+    targetAllocation: "Target allocation",
+    riskNotTaken:
+      "Test not taken. Make sure one of the recommendations suggests taking the test and explains the value.",
+    observationsHeader:
+      "## What rule-based checks noticed (severity 1=critical, 3=observation)",
+    finalInstruction:
+      "Produce 3–6 recommendations following the schema (level/title/description/action). " +
+      "Cover ALL severe observations (severity 1–2) with at least one recommendation. " +
+      "Don't repeat yourself, write concisely and to the point.",
+  },
+};

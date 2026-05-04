@@ -24,7 +24,10 @@ export class CryptoDataWorkerController {
   }
 
   @MessagePattern(CRYPTO_DATA_WORKER_PATTERNS.LIST_ASSETS)
-  async listAssets(@Payload() payload?: { limit: number; offset?: number }) {
+  async listAssets(
+    @Payload()
+    payload?: { limit?: number; offset?: number; category?: string },
+  ) {
     return this.cryptoDataWorkerService.listAssets(payload);
   }
 

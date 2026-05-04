@@ -34,6 +34,13 @@ export class CryptoDataWorkerController {
     description: 'Смещение выборки (для пагинации), по умолчанию 0',
     example: 0,
   })
+  @ApiQuery({
+    name: 'category',
+    required: false,
+    description:
+      'Фильтр по категории (id из CATEGORY_KEYWORDS): stablecoins, blockchains, l2, defi, liquidStaking, ai, aiAgents, meme, rwa, gaming, depin, privacy, exchangeTokens',
+    example: 'ai',
+  })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Список активов',
@@ -62,8 +69,17 @@ export class CryptoDataWorkerController {
     },
   })
   @Get()
-  async listAssets(@Query('limit') limit?: string, @Query('offset') offset?: string) {
-    return this.cryptoDataWorkerService.listAssets(Number(limit), Number(offset));
+  async listAssets(
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+    @Query('category') category?: string,
+  ) {
+    const safeCategory = category && category.trim() ? category.trim() : undefined;
+    return this.cryptoDataWorkerService.listAssets(
+      Number(limit),
+      Number(offset),
+      safeCategory,
+    );
   }
 
   @Get("search")

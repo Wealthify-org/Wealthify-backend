@@ -7,3 +7,5 @@ export * from "./crypto-data-scrapper.helpers"
 export * from "./types/search.types"
 
 export * from "./dto/search-asset.dto"
+
+export * from "./category-keywords";

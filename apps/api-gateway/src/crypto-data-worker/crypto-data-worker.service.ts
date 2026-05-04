@@ -21,8 +21,12 @@ export class CryptoDataWorkerService {
     return sendOrThrow(this.workerMs, CRYPTO_DATA_WORKER_PATTERNS.GET_CHARTS_BY_TICKER, { ticker });
   }
 
-  listAssets(limit?: number, offset?: number) {
-    return sendOrThrow(this.workerMs, CRYPTO_DATA_WORKER_PATTERNS.LIST_ASSETS, { limit, offset });
+  listAssets(limit?: number, offset?: number, category?: string) {
+    return sendOrThrow(this.workerMs, CRYPTO_DATA_WORKER_PATTERNS.LIST_ASSETS, {
+      limit,
+      offset,
+      category,
+    });
   }
 
   searchAssets(query: string, limit?: number) {

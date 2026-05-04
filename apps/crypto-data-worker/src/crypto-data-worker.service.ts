@@ -5,7 +5,14 @@ import { Asset } from '../../../libs/crypto-data/models/asset.model';
 import { Op, Sequelize, literal } from "sequelize";
 import { AssetType, ChartPayload, CryptoData, RangeKey, SeriesPoint } from "@libs/contracts";
 import { rpcError } from "@libs/contracts/common";
-import { SearchAssetDto, SearchAssetsHttpResponse, SearchAssetsParams } from "@libs/contracts/crypto-data-worker";
+import {
+  SearchAssetDto,
+  SearchAssetsHttpResponse,
+  SearchAssetsParams,
+  buildCategoryIlikePatterns,
+  getAssetCategoryIds,
+  parseCategoriesString,
+} from "@libs/contracts/crypto-data-worker";
 
 
 @Injectable()
@@ -45,22 +52,36 @@ export class CryptoDataWorkerService {
     return assetData;
   }
 
-  async listAssets(params?: { limit?: number; offset?: number }) {
-    const limit = 
+  async listAssets(params?: { limit?: number; offset?: number; category?: string }) {
+    const limit =
       params?.limit && params.limit > 0 && params.limit <= 200 ? params.limit : 50;
     const offset = params?.offset && params.offset >= 0 ? params.offset : 0;
 
+    // ── фильтр по категории ─────────────────────────────────────────────
+    // Маппим id категории (e.g. "ai") на набор ILIKE-паттернов с учётом
+    // границ ';' — чтобы "meme" не зацепил "AI Memes".
+    let where: any = undefined;
+    if (params?.category) {
+      const patterns = buildCategoryIlikePatterns(params.category);
+      if (patterns.length) {
+        where = {
+          categories: {
+            [Op.or]: patterns.map((p) => ({ [Op.iLike]: p })),
+          },
+        };
+      }
+    }
+
     const { rows, count } = await this.cryptoAssetRepo.findAndCountAll({
+      where,
       limit,
       offset,
-      order: [['rank', 'ASC']],
-      include: [
-        { model: this.assetRepo, required: false },
-      ],
+      order: [["rank", "ASC"]],
+      include: [{ model: this.assetRepo, required: false }],
     });
 
     const items = rows.map((row) => ({
-      id: row.assetId, 
+      id: row.assetId,
       name: row.name,
       ticker: row.ticker,
       logoUrlLocal: row.logoUrlLocal ?? null,
@@ -75,12 +96,15 @@ export class CryptoDataWorkerService {
       fdvUsd: row.fdvUsd ?? null,
       volume24HUsd: row.volume24HUsd ?? null,
       sparkline7D: row.sparkline7D ?? null,
+      // сырые теги (для tooltips/UI), и наши id (для фильтра на клиенте)
+      categories: parseCategoriesString(row.categories),
+      categoryIds: getAssetCategoryIds(row.categories),
     }));
 
     return {
-      items: items,
+      items,
       total: count,
-      limit, 
+      limit,
       offset,
     };
   }

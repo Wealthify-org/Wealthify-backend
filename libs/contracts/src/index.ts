@@ -11,6 +11,7 @@ export * from "./auth/dto/refresh-token.dto";
 export * from "./auth/dto/reset-password.dto";
 
 export * from "./portfolios/dto/create-portfolio.dto";
+export * from "./portfolios/portfolios.pattern";
 
 export * from "./roles/dto/create-role.dto";
 

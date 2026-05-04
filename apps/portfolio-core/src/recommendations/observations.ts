@@ -142,24 +142,26 @@ export function buildObservations(
     return { observations: obs, actualAllocation: actual };
   }
 
-  // 1) Concentration — есть ли актив >50% от портфеля
+  // 1) Concentration — есть ли актив >50% от портфеля.
+  //    severity 1 (warning) — только для очень высокой концентрации ≥80%.
+  //    severity 2 (info)    — концентрация 50–80%.
   for (const a of portfolio.assets) {
     const sharePct = (a.valueUsd / portfolio.totalValueUsd) * 100;
     if (sharePct >= 50) {
       obs.push({
         kind: "high_concentration",
-        severity: 1,
+        severity: sharePct >= 80 ? 1 : 2,
         fact: `${a.ticker} занимает ${sharePct.toFixed(1)}% портфеля — высокая концентрация в одном активе.`,
         data: { ticker: a.ticker, sharePct: Math.round(sharePct) },
       });
     }
   }
 
-  // 2) Low diversification — всего <= 2 активов
+  // 2) Low diversification — всего <= 2 активов (всегда info, не warning)
   if (portfolio.assets.length <= 2) {
     obs.push({
       kind: "low_diversification",
-      severity: 2,
+      severity: 3,
       fact: `Портфель содержит всего ${portfolio.assets.length} актив(а) — низкая диверсификация.`,
       data: { assetCount: portfolio.assets.length },
     });
@@ -168,7 +170,8 @@ export function buildObservations(
   if (risk) {
     const target = risk.targetAllocation;
 
-    // 3) Drift по категориям — отклонение от целевой
+    // 3) Drift по категориям — отклонение от целевой.
+    //    Все drift'ы идут как наблюдения (severity 3), не warning'и.
     const driftKinds: Array<{
       cat: keyof PortfolioActualAllocation;
       kind: ObservationKind;
@@ -186,35 +189,37 @@ export function buildObservations(
       if (Math.abs(delta) >= 12) {
         obs.push({
           kind,
-          severity: Math.abs(delta) >= 25 ? 1 : 2,
+          severity: 3,
           fact: `Доля категории "${cat}" составляет ${actualPct.toFixed(1)}% при целевой ${targetPct}% (отклонение ${delta > 0 ? "+" : ""}${delta.toFixed(1)} п.п.).`,
           data: { actualPct, targetPct, deltaPp: Math.round(delta * 10) / 10 },
         });
       }
     }
 
-    // 4) Excessive small alts для Conservative/Moderate
+    // 4) Excessive small alts для Conservative/Moderate — info, не warning
     if (
       (risk.bucket === "Conservative" || risk.bucket === "Moderate") &&
       actual.smallAlts > target.smallAlts + 10
     ) {
       obs.push({
         kind: "excessive_small_alts",
-        severity: 1,
-        fact: `Доля мелких альткоинов ${actual.smallAlts.toFixed(1)}% превышает рекомендуемую для профиля "${risk.bucketTitle}" (целевая ≤${target.smallAlts}%).`,
+        severity: 3,
+        fact: `Доля мелких альткоинов ${actual.smallAlts.toFixed(1)}% выше целевой ${target.smallAlts}% для профиля "${risk.bucketTitle}".`,
         data: { actualPct: actual.smallAlts, targetPct: target.smallAlts },
       });
     }
 
-    // 5) Missing stables для Conservative
+    // 5) Missing stables — warning только для консервативного профиля при
+    //    почти полном отсутствии стейблов; иначе info.
     if (
       risk.bucket === "Conservative" &&
       actual.stables < Math.max(20, target.stables - 15)
     ) {
+      const isCritical = actual.stables < 5;
       obs.push({
         kind: "missing_stables",
-        severity: 1,
-        fact: `Стейблкоинов в портфеле всего ${actual.stables.toFixed(1)}% при рекомендуемых ${target.stables}% для консервативного профиля.`,
+        severity: isCritical ? 1 : 3,
+        fact: `Стейблкоинов в портфеле ${actual.stables.toFixed(1)}% при ориентире ${target.stables}% для консервативного профиля.`,
         data: { actualPct: actual.stables, targetPct: target.stables },
       });
     }
@@ -254,6 +259,12 @@ export function observationsToRecommendations(
     ];
   }
 
+  // severity → level: 1 = warning (только реальные системные риски),
+  //                   2 = info (наблюдение средней значимости),
+  //                   3 = info (мягкое наблюдение / идея для размышления)
+  const sevToLevel = (s: 1 | 2 | 3): "warning" | "info" =>
+    s === 1 ? "warning" : "info";
+
   return observations.slice(0, 6).map((o): RecommendationDto => {
     switch (o.kind) {
       case "no_assets":
@@ -261,58 +272,68 @@ export function observationsToRecommendations(
           level: "info",
           title: "Портфель пока пуст",
           description:
-            "Добавьте несколько активов, чтобы платформа смогла оценить структуру и выдать персональные рекомендации.",
-          action: "Добавить активы в портфель",
+            "Добавьте несколько активов, чтобы платформа смогла оценить структуру и предложить персональные идеи.",
+          action: "Можно начать с добавления первых позиций в портфель.",
         };
       case "high_concentration":
         return {
-          level: "warning",
-          title: `Концентрация в ${o.data?.ticker}`,
-          description: o.fact + " При резком движении этого актива потери будут болезненными.",
-          action: `Сократите долю ${o.data?.ticker} до 30–40% и распределите по нескольким активам.`,
+          level: sevToLevel(o.severity),
+          title: `Высокая доля ${o.data?.ticker} в портфеле`,
+          description:
+            o.fact +
+            " Это означает, что динамика портфеля сильно повторяет движение одного актива.",
+          action: `Можно подумать о постепенном добавлении других активов, чтобы снизить зависимость от ${o.data?.ticker}.`,
         };
       case "low_diversification":
         return {
-          level: "warning",
-          title: "Низкая диверсификация",
-          description: o.fact +
-            " Для устойчивости портфеля рекомендуется держать минимум 4–6 различных активов.",
-          action: "Добавьте 3–5 активов из разных категорий (BTC, ETH, крупные альты, стейблы).",
+          level: "info",
+          title: "Небольшое число активов в портфеле",
+          description:
+            o.fact +
+            " Несколько разных активов в портфеле обычно делают его более устойчивым к движениям отдельных монет.",
+          action:
+            "Один из вариантов — добавить активы из разных категорий: BTC, ETH, крупные альты, стейблы.",
         };
       case "stables_drift":
       case "btc_drift":
       case "eth_drift":
       case "alts_drift":
         return {
-          level: o.severity === 1 ? "warning" : "info",
+          level: "info",
           title: "Отклонение от целевой структуры",
-          description: o.fact +
+          description:
+            o.fact +
             (risk
-              ? ` Для профиля "${risk.bucketTitle}" структура должна быть ближе к рекомендуемой.`
+              ? ` Для профиля «${risk.bucketTitle}» это просто наблюдение — можно учесть при следующей перебалансировке.`
               : ""),
         };
       case "excessive_small_alts":
         return {
-          level: "warning",
-          title: "Слишком много мелких альткоинов",
-          description: o.fact +
-            " Мелкие альткоины — самые волатильные активы и могут резко обесцениться.",
-          action: "Зафиксируйте часть прибыли в стейблах или крупных активах (BTC/ETH).",
+          level: "info",
+          title: "Заметная доля мелких альткоинов",
+          description:
+            o.fact +
+            " Мелкие альткоины — самые волатильные активы, и их доля влияет на общий уровень риска портфеля.",
+          action:
+            "Стоит подумать о том, чтобы перевести часть прибыли в более устойчивые активы — стейблы, BTC или ETH.",
         };
       case "missing_stables":
         return {
-          level: "warning",
-          title: "Не хватает стейблкоинов",
-          description: o.fact +
-            " Стейблы — это «подушка безопасности» и инструмент для входа в просадках.",
-          action: "Зафиксируйте 20–30% портфеля в стейблкоинах.",
+          level: sevToLevel(o.severity),
+          title: "Мало стейблкоинов в портфеле",
+          description:
+            o.fact +
+            " Стейблы дают запас ликвидности — на просадках их можно использовать для входа в активы по более низким ценам.",
+          action:
+            "Полезно было бы выделить часть капитала в стейблкоины — это создаст резерв на случай рыночных колебаний.",
         };
       case "healthy_match":
         return {
           level: "positive",
-          title: "Структура соответствует профилю",
-          description: o.fact +
-            " Продолжайте отслеживать перебалансировку — раз в 1–3 месяца достаточно.",
+          title: "Структура близка к целевой",
+          description:
+            o.fact +
+            " Можно отслеживать перебалансировку раз в 1–3 месяца — этого обычно достаточно.",
         };
     }
   });

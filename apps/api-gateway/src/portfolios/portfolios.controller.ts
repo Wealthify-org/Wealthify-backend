@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 import { PortfoliosService } from './portfolios.service';
@@ -96,7 +96,9 @@ export class PortfoliosController {
   getRecommendations(
     @Param('id') id: string,
     @CurrentUser('id') userId: number,
+    @Query('lang') lang?: string,
   ) {
-    return this.portfolios.getRecommendations(Number(id), userId);
+    const safeLang = lang === 'en' || lang === 'ru' ? lang : undefined;
+    return this.portfolios.getRecommendations(Number(id), userId, safeLang);
   }
 }

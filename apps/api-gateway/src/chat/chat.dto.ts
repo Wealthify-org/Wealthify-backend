@@ -27,6 +27,12 @@ export const ChatCompletionsSchema = z
      * Используется для подгрузки детального контекста.
      */
     contextPortfolioId: z.coerce.number().int().positive().optional(),
+
+    /**
+     * Язык, на котором пользователь хочет получать ответы.
+     * "ru" — по умолчанию, "en" — английский.
+     */
+    lang: z.enum(["ru", "en"]).optional(),
   })
   .strict();
 

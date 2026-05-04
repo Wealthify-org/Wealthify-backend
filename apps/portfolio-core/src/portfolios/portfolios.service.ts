@@ -11,6 +11,7 @@ import { rpcError } from "@libs/contracts/common";
 import { UserPortfoliosSummaryDto } from "@libs/contracts/portfolios/dto/user-portfolios-summary.dto";
 import { ASSETS_CLIENT } from "./portfolio.constants";
 import { ASSETS_PATTERNS } from "@libs/contracts/assets/assets.pattern";
+import { getAssetCategoryIds } from "@libs/contracts/crypto-data-worker";
 
 // локальный тип того, что вернёт сервис активов
 interface AssetWithData {
@@ -22,6 +23,7 @@ interface AssetWithData {
     currentPriceUsd?: number | null;
     change24HUsdPct?: number | null;
     logoUrlLocal?: string | null;
+    categories?: string | null;
   };
 }
 
@@ -250,6 +252,11 @@ export class PortfoliosService {
           profitPct: invested > 0 ? ((valueNow - invested) / invested) * 100 : 0,
           change24hAbsUsd: valueNow - value24hAgo,
           logoUrlLocal: (asset as any).assetData?.logoUrlLocal ?? null,
+          // id категорий (e.g. ["ai", "depin"]) — для client-side фильтра
+          // в таблице холдингов
+          categoryIds: getAssetCategoryIds(
+            (asset as any).assetData?.categories ?? null,
+          ),
         };
       })
       .filter((x): x is NonNullable<typeof x> => x !== null);

@@ -34,12 +34,12 @@ export class PortfoliosService {
     return sendOrThrow(this.appMs, PORTFOLIOS_PATTERNS.DELETE_BY_ID, { id });
   }
 
-  getRecommendations(portfolioId: number, userId: number) {
+  getRecommendations(portfolioId: number, userId: number, lang?: 'ru' | 'en') {
     // увеличиваем таймаут — LLM может отвечать до 25 секунд
     return sendOrThrow(
       this.appMs,
       RECOMMENDATIONS_PATTERNS.GENERATE_FOR_PORTFOLIO,
-      { portfolioId, userId },
+      { portfolioId, userId, lang },
       45_000,
     );
   }
