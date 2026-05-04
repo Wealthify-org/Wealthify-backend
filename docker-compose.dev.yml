@@ -209,15 +209,18 @@ services:
       - wealthify-network
 
   # ── Frontend (Next.js dev) ──────────────────────────────────────────────
-  # Контекст билда — соседняя папка wealthify-web/. Bind-mount даёт hot-reload;
-  # анонимный том на node_modules защищает их от затирания bind-mount'ом
-  # (на macOS host-овые node_modules могут быть несовместимы с linux-билдом).
+  # Контекст билда — соседняя папка с фронтенд-репо. По умолчанию ожидаем
+  # имя `Wealthify-client` (так называется GitHub-репозиторий и именно
+  # такая папка создаётся при `git clone`). Если у тебя локально другое
+  # имя (например `wealthify-web`), переопредели через переменную
+  # окружения: `WEB_REPO_PATH=../wealthify-web docker compose ... up`.
+  #
   # NEXT_PUBLIC_API_URL — куда ходит браузер (хост:порт),
   # INTERNAL_API_URL  — куда ходит сам Next-server (внутр. имя docker-сети).
   web:
     container_name: wealthify-web-dev
     build:
-      context: ../wealthify-web
+      context: ${WEB_REPO_PATH:-../Wealthify-client}
       dockerfile: Dockerfile.dev
     environment:
       - NODE_ENV=development
@@ -230,7 +233,7 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ../wealthify-web:/app
+      - ${WEB_REPO_PATH:-../Wealthify-client}:/app
       - web_node_modules:/app/node_modules
       - web_next_cache:/app/.next
     command: npm run dev

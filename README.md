@@ -29,17 +29,23 @@ HTTP-шлюз на :5001 с Swagger-документацией.
 
 ```bash
 mkdir wealthify && cd wealthify
-git clone <Wealthify-backend-url>  # текущий репо
-git clone <wealthify-web-url>      # фронтенд
+git clone https://github.com/Wealthify-org/Wealthify-backend.git
+git clone https://github.com/Wealthify-org/Wealthify-client.git
 ```
 
-Структура должна быть такой:
+Структура должна быть такой (имена папок совпадают с именами GitHub-репо):
 
 ```
 wealthify/
 ├── Wealthify-backend/   ← вы здесь
-└── wealthify-web/       ← фронтенд (см. его README)
+└── Wealthify-client/    ← фронтенд (см. его README)
 ```
+
+> Если ты переименовал папку фронтенда (например в `wealthify-web/`),
+> запусти compose с переменной окружения:
+> ```bash
+> WEB_REPO_PATH=../wealthify-web docker compose -f docker-compose.dev.yml up -d --build
+> ```
 
 ### 2. Поднять стек одной командой
 
