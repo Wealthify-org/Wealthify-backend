@@ -3,20 +3,33 @@ import { User } from './users.model';
 import { InjectModel } from '@nestjs/sequelize';
 import { CreateUserDto, AddRoleDto } from "@libs/contracts";
 import { RolesService } from '../roles/roles.service';
+import { Role } from '../roles/roles.model';
 import { rpcError } from '@libs/contracts/common';
+
+/**
+ * Лёгкий include под "обычный" fetch юзера: подтягиваем только роли через
+ * many-to-many. Раньше использовался `include: { all: true, nested: true }`,
+ * который пробрасывал все ассоциации (RefreshToken, ResetToken, ChatMessage,
+ * UserRoles join-table) — лишний JOIN на каждом запросе авторизации.
+ */
+const USER_WITH_ROLES_INCLUDE = [
+  { model: Role, through: { attributes: [] } },
+];
 
 @Injectable()
 export class UsersService {
-  constructor(@InjectModel(User) private userRepository: typeof User, 
-              private roleService: RolesService) {}
+  constructor(
+    @InjectModel(User) private userRepository: typeof User,
+    private roleService: RolesService,
+  ) {}
 
   async createUser(dto: CreateUserDto) {
     const { email } = dto
+
+    // Существование проверяем минимально: только id, без include + без raw.
     const existingUser = await this.userRepository.findOne({
-      where: {email},
-      include: {all: true, nested: true}, 
-      nest: true, 
-      raw: true
+      where: { email },
+      attributes: ['id'],
     })
 
     if (existingUser) {
@@ -25,61 +38,63 @@ export class UsersService {
 
     const user = await this.userRepository.create(dto)
     const role = await this.roleService.getRoleByValue('USER')
-    
+
     if (!role) {
-      rpcError(HttpStatus.NOT_FOUND, 'ROLE_NOT_FOUND', "Role \'USER\' not found");
+      rpcError(HttpStatus.NOT_FOUND, 'ROLE_NOT_FOUND', "Role 'USER' not found");
     }
 
     await user.$set('roles', [role.id])
     user.roles = [role]
-    
+
     return user
   }
 
   async getAllUsers() {
-    const users = await this.userRepository.findAll({include: {all: true}})
-    return users
+    return this.userRepository.findAll({ include: USER_WITH_ROLES_INCLUDE })
   }
 
   async getUserByEmail(email: string) {
-    const user = await this.userRepository.findOne({where: {email}, include: {all: true, nested: true}})
-    return user
+    return this.userRepository.findOne({
+      where: { email },
+      include: USER_WITH_ROLES_INCLUDE,
+    })
   }
 
   async getUserByUsername(username: string) {
-    const user = this.userRepository.findOne({where: {username}, include: {all: true, nested: true}});
-    return user;
+    return this.userRepository.findOne({
+      where: { username },
+      include: USER_WITH_ROLES_INCLUDE,
+    });
   }
 
   async getUserById(userId: number) {
-    const user = this.userRepository.findByPk(userId, {include: {all: true, nested: true}})
-    return user
+    return this.userRepository.findByPk(userId, {
+      include: USER_WITH_ROLES_INCLUDE,
+    })
   }
 
   async addRoleToUser(dto: AddRoleDto) {
     const { userId, value } = dto
-    const user = await this.userRepository.findByPk(
-      userId, {include: {all: true, nested: true}}
-    )
+
+    // user + role параллельно — независимые запросы
+    const [user, role] = await Promise.all([
+      this.userRepository.findByPk(userId, { include: USER_WITH_ROLES_INCLUDE }),
+      this.roleService.getRoleByValue(value),
+    ])
 
     if (!user) {
       rpcError(HttpStatus.NOT_FOUND, 'USER_NOT_FOUND', `User with id ${userId} doesn't exist`);
     }
-
-    const role = await this.roleService.getRoleByValue(value)
     if (!role) {
       rpcError(HttpStatus.NOT_FOUND, 'ROLE_NOT_FOUND', `Role '${value}' not found`);
     }
 
-    console.log(user.dataValues)
-
-    const hasRole = user.dataValues.roles.some(role => role.value === value)
+    const hasRole = (user.dataValues.roles ?? []).some((r) => r.value === value)
     if (hasRole) {
       rpcError(HttpStatus.CONFLICT, 'ROLE_ALREADY_ASSIGNED', `User already has role ${value}`);
     }
 
     await user.$add('roles', role.id)
-
 
     return { message: `Role ${value} was successfully added to user ${userId}` }
   }

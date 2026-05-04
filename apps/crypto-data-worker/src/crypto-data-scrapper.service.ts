@@ -1,4 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnApplicationShutdown,
+} from '@nestjs/common';
 import { PuppeteerService } from './puppeteer.service';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Worker } from "worker_threads";
@@ -17,14 +21,17 @@ import type { WorkerInput } from './workers/crypto-worker-types';
 import { splitIntoBatches, splitIntoChunks } from '@libs/contracts/crypto-data-worker';
 
 const DEBUG_SCREENSHOTS_DIR = path.resolve(process.cwd(), 'debug-screenshots');
-const LINKS_TO_PARSE = 1000;
+const LINKS_TO_PARSE = 2050;
 @Injectable()
-export class CryptoDataScrapperService {
+export class CryptoDataScrapperService implements OnApplicationShutdown {
   private readonly log = new Logger('CryptoDataWorker');
   private readonly baseUrl = 'https://www.coingecko.com/en/all-cryptocurrencies';
   private readonly proxies: ProxyConfig[];
 
   private isRunning = false;
+  /** Активные worker-потоки парсинга — нужно знать их при shutdown'е. */
+  private readonly activeWorkers = new Set<Worker>();
+  private shuttingDown = false;
 
   constructor(
     private readonly pp: PuppeteerService,
@@ -33,7 +40,60 @@ export class CryptoDataScrapperService {
     this.proxies = loadProxiesFromEnv();
   }
 
-  // @Cron(CronExpression.EVERY_10_SECONDS) // каждые 5 минут
+  /**
+   * onApplicationShutdown срабатывает при app.close() (после
+   * enableShutdownHooks + SIGINT/SIGTERM или явного вызова из main.ts).
+   *
+   * Стратегия:
+   *  1. Шлём всем активным worker'ам сообщение о shutdown — они закроют
+   *     свои Chrome-инстансы и завершатся сами.
+   *  2. Ждём естественного exit'а до 5 секунд.
+   *  3. Кто не успел — добиваем `worker.terminate()`. После этого
+   *     PuppeteerService.onApplicationShutdown добьёт оставшиеся Chrome
+   *     по PID, если какие-то были запущены из главного потока.
+   */
+  async onApplicationShutdown(signal?: string): Promise<void> {
+    this.shuttingDown = true;
+    if (this.activeWorkers.size === 0) return;
+
+    this.log.warn(
+      `onApplicationShutdown(${signal ?? '-'}) — terminating ${this.activeWorkers.size} active parse worker(s)`,
+    );
+
+    const workers = Array.from(this.activeWorkers);
+
+    // 1) graceful: попросить worker закрыть browser и выйти
+    for (const w of workers) {
+      try {
+        w.postMessage({ type: 'shutdown' });
+      } catch {
+        /* worker уже мёртв — ок */
+      }
+    }
+
+    // 2) ждём до 5 секунд их естественного exit'а
+    await Promise.all(
+      workers.map(
+        (w) =>
+          new Promise<void>((resolve) => {
+            const timer = setTimeout(() => {
+              this.log.warn(
+                'Worker did not exit gracefully in 5s — calling terminate()',
+              );
+              w.terminate().catch(() => {}).finally(() => resolve());
+            }, 5_000);
+            w.once('exit', () => {
+              clearTimeout(timer);
+              resolve();
+            });
+          }),
+      ),
+    );
+
+    this.activeWorkers.clear();
+  }
+
+  @Cron(CronExpression.EVERY_10_SECONDS)
   async collectAllAssetsDataCron() {
     if (this.isRunning) {
       this.log.warn('Previous collectAllAssets run is still in progress, skipping this tick');
@@ -51,7 +111,7 @@ export class CryptoDataScrapperService {
   }
 
   private async collectAllAssets() {
-    this.log.log('Collecting TOP-200 from CoinGecko...');
+    this.log.log(`Collecting TOP-${LINKS_TO_PARSE} from CoinGecko...`);
     const page = await this.pp.newPage(this.proxies[0]);
 
     try {
@@ -120,7 +180,7 @@ export class CryptoDataScrapperService {
         totalCount,
       });
 
-      this.log.log(`Collected ${links.length} links (need first 200).`);
+      this.log.log(`Collected ${links.length} links (need first ${limit}).`);
 
       return links.slice(0, limit);
   }
@@ -169,17 +229,37 @@ export class CryptoDataScrapperService {
           let settled = false;
 
           const worker = new Worker(workerScript);
+          this.activeWorkers.add(worker);
+
           const data: WorkerInput = { proxy, links };
 
-          worker.once("message", (cryptoDatas: CryptoData[]) => {
+          worker.once("message", (msg: any) => {
+            // Поддерживаем два формата:
+            //  – legacy: massiv CryptoData (дальше будем плавно мигрировать)
+            //  – новый : { type: 'result', data: CryptoData[] }
+            const cryptoDatas: CryptoData[] = Array.isArray(msg)
+              ? msg
+              : msg?.type === "result" && Array.isArray(msg.data)
+                ? msg.data
+                : [];
+
             settled = true;
             this.log.log(
               `Worker for ${proxy.host}:${proxy.port} parsed ${cryptoDatas.length} assets`,
             );
-            worker
-              .terminate()
-              .catch(() => {})
-              .finally(() => resolve(cryptoDatas));
+            // worker сам завершится после postMessage; ждём его exit вместо
+            // немедленного terminate(), чтобы дать ему время закрыть Chrome
+            const exitTimer = setTimeout(() => {
+              this.log.warn(
+                `Worker for ${proxy.host}:${proxy.port} did not exit in 3s after result — terminating`,
+              );
+              worker.terminate().catch(() => {});
+            }, 3_000);
+            worker.once("exit", () => {
+              clearTimeout(exitTimer);
+              this.activeWorkers.delete(worker);
+              resolve(cryptoDatas);
+            });
           });
 
           worker.once("error", (err) => {
@@ -189,7 +269,10 @@ export class CryptoDataScrapperService {
               worker
                 .terminate()
                 .catch(() => {})
-                .finally(() => resolve([])); // считаем, что этот воркер ничего не дал
+                .finally(() => {
+                  this.activeWorkers.delete(worker);
+                  resolve([]);
+                });
             }
           });
 
@@ -201,6 +284,8 @@ export class CryptoDataScrapperService {
             } else {
               this.log.debug?.(`Worker exited with code ${code}`);
             }
+
+            this.activeWorkers.delete(worker);
 
             if (!settled) {
               settled = true;

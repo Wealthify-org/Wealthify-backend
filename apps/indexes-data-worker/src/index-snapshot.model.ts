@@ -29,7 +29,15 @@ interface IndexSnapshotCreationAttrs {
   goldChange24hPct: number;
 }
 
-@Table({ tableName: "index_snapshots", timestamps: false })
+@Table({
+  tableName: "index_snapshots",
+  timestamps: false,
+  // findOne({order:[['capturedAt','DESC']]}) — каждый запрос чата/dashboard.
+  // Без индекса PG делает full sort.
+  indexes: [
+    { name: "index_snapshots_captured_at_idx", fields: ["capturedAt"] },
+  ],
+})
 export class IndexSnapshot extends Model<IndexSnapshot, IndexSnapshotCreationAttrs> {
   @ApiProperty({ example: 1, description: "Уникальный идентификатор снэпшота" })
   @Column({

@@ -1,4 +1,5 @@
 import { InjectModel } from '@nestjs/sequelize';
+import { Portfolio } from '../portfolios/portfolios.model';
 import { Transaction } from './transactions.model';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { PortfolioAssets } from '../portfolio-assets/portfolio-assets.model';
@@ -11,7 +12,32 @@ export class TransactionsService {
   constructor(
     @InjectModel(Transaction) private transactionRepository: typeof Transaction,
     @InjectModel(PortfolioAssets) private portfolioAssetRepository: typeof PortfolioAssets,
+    @InjectModel(Portfolio) private portfolioRepository: typeof Portfolio,
   ) {}
+
+  /** Проверяет, что портфель принадлежит вызывающему. Иначе rpcError 403. */
+  private async assertPortfolioOwnedByUser(
+    portfolioId: number,
+    userId: number,
+  ): Promise<void> {
+    const portfolio = await this.portfolioRepository.findByPk(portfolioId, {
+      attributes: ['id', 'userId'],
+    });
+    if (!portfolio) {
+      rpcError(
+        HttpStatus.NOT_FOUND,
+        'PORTFOLIO_NOT_FOUND',
+        `Portfolio ${portfolioId} not found`,
+      );
+    }
+    if (portfolio.userId !== userId) {
+      rpcError(
+        HttpStatus.FORBIDDEN,
+        'PORTFOLIO_FORBIDDEN',
+        `Portfolio ${portfolioId} doesn't belong to user ${userId}`,
+      );
+    }
+  }
   
   async createTransaction(dto: CreateTransactionDto) {
     return this.transactionRepository.create(dto)
@@ -21,15 +47,21 @@ export class TransactionsService {
     return this.transactionRepository.findAll({ include: {all: true} })
   }
 
-  async getAllPortfolioTransactions(portfolioId: number) {
+  async getAllPortfolioTransactions(portfolioId: number, userId: number) {
+    await this.assertPortfolioOwnedByUser(portfolioId, userId);
     return this.transactionRepository.findAll({where: {portfolioId}, include: {all: true}})
   }
 
-  async deleteTransaction(id: number) {
+  async deleteTransaction(id: number, userId: number) {
     const transaction = await this.transactionRepository.findByPk(id)
     if (!transaction) {
       rpcError(HttpStatus.NOT_FOUND, 'TRANSACTION_NOT_FOUND', `Transaction with id ${id} doesn't exist`);
     }
+    // Ownership-check: транзакция принадлежит портфелю текущего пользователя.
+    await this.assertPortfolioOwnedByUser(
+      transaction.dataValues.portfolioId,
+      userId,
+    );
     let portfolioAsset = await this.getOrCreatePortfolioAsset(transaction)
 
     if (!portfolioAsset && transaction.dataValues.type === 'BUY') {
@@ -61,22 +93,21 @@ export class TransactionsService {
   }
 
   private async getOrCreatePortfolioAsset(transaction: Transaction) {
-    const {portfolioId, assetId, type} = transaction.dataValues
-    let portfolioAsset = await this.portfolioAssetRepository.findOne({where: { portfolioId, assetId }})
+    const { portfolioId, assetId, type } = transaction.dataValues
+    const portfolioAsset = await this.portfolioAssetRepository.findOne({
+      where: { portfolioId, assetId },
+    })
 
-    if (!portfolioAsset && type === 'BUY') return null
+    if (portfolioAsset) return portfolioAsset
+    if (type === 'BUY') return null
 
-    if (!portfolioAsset) {
-      await this.portfolioAssetRepository.create({
-        portfolioId, 
-        assetId,
-        quantity: 0,
-        averageBuyPrice: 0
-      })
-      portfolioAsset = await this.portfolioAssetRepository.findOne({where: {portfolioId, assetId}})
-    }
-
-    return portfolioAsset
+    // create() возвращает уже сохранённый instance — лишний findOne не нужен
+    return this.portfolioAssetRepository.create({
+      portfolioId,
+      assetId,
+      quantity: 0,
+      averageBuyPrice: 0,
+    })
   }
 
   private async handleBuyTransactionDeletion(transaction: Transaction, portfolioAsset: PortfolioAssets) {
@@ -125,11 +156,11 @@ export class TransactionsService {
   }
 
   async deleteAllLinkedTransactions(dto: DeleteAllLinkedTransactionsDto) {
-    const {portfolioId, assetId} = dto
-    const transactions = await this.transactionRepository.findAll({where: {portfolioId, assetId}})
-
-    for (const transaction of transactions) {
-      await transaction.destroy()
-    }
+    const { portfolioId, assetId } = dto
+    // Один bulk DELETE вместо findAll + per-row destroy. Был N+1 при
+    // удалении актива с большой историей транзакций.
+    await this.transactionRepository.destroy({
+      where: { portfolioId, assetId },
+    })
   }
 }

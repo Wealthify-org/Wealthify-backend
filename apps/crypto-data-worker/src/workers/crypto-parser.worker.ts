@@ -18,8 +18,77 @@ import { HTTPResponse, Page } from "puppeteer";
 
 const puppeteerService = new PuppeteerService();
 
-parentPort.on("message", async (data: WorkerInput) => {
-  const {proxy, links} = data;
+/**
+ * Флаг "получили сигнал на остановку". Перед каждой следующей ссылкой
+ * парсинг проверяет это значение — если true, прерывает цикл и идёт
+ * в finally закрывать браузер. Это безопаснее чем `worker.terminate()`
+ * из родителя, потому что terminate убивает V8-isolate сразу и Chrome
+ * становится сиротой.
+ */
+let aborted = false;
+
+/** Текущая прокси — нужна, чтобы знать какой browser закрывать в cleanup'е. */
+let currentProxy: import("../proxies").ProxyConfig | undefined;
+let cleanupStarted = false;
+
+const cleanup = async (reason: string): Promise<void> => {
+  if (cleanupStarted) return;
+  cleanupStarted = true;
+  aborted = true;
+  try {
+    console.log(`[WORKER] cleanup start (${reason}) — closing browsers`);
+    await puppeteerService.closeAll();
+  } catch (e) {
+    console.error(`[WORKER] cleanup failed: ${e}`);
+  }
+};
+
+/**
+ * Hard-fallback: если cleanup завис на 6 секундах — уходим из процесса,
+ * Chrome будет добит SIGKILL'ом из PuppeteerService.closeAll благодаря
+ * внутреннему 3-секундному таймеру. unref() чтобы таймер сам не держал
+ * процесс живым.
+ */
+const scheduleHardExit = (delayMs = 6_000) => {
+  setTimeout(() => {
+    console.error("[WORKER] cleanup did not finish in time — process.exit(0)");
+    process.exit(0);
+  }, delayMs).unref();
+};
+
+// ── Сигналы / события прекращения ──────────────────────────────────────
+
+// Родитель вызвал worker.terminate() — `parentPort` закрывается. Это
+// последний шанс быстро убить Chrome перед тем как V8 isolate умрёт.
+parentPort.on("close", () => {
+  scheduleHardExit(2_000);
+  void cleanup("parentPort.close");
+});
+
+// Если процесс получит SIGTERM/SIGINT (worker shares process с main).
+process.on("SIGTERM", () => {
+  scheduleHardExit();
+  void cleanup("SIGTERM");
+});
+process.on("SIGINT", () => {
+  scheduleHardExit();
+  void cleanup("SIGINT");
+});
+
+parentPort.on("message", async (msg: any) => {
+  // Вариант 1 — родитель попросил завершиться: прерываем цикл, закрываем
+  // browser, выходим естественно (ждём parentPort.postMessage не нужно).
+  if (msg && typeof msg === "object" && msg.type === "shutdown") {
+    scheduleHardExit();
+    await cleanup("shutdown-message");
+    process.exit(0);
+    return;
+  }
+
+  // Вариант 2 — данные на парсинг.
+  const data = msg as WorkerInput;
+  const { proxy, links } = data;
+  currentProxy = proxy;
   const cryptoData: CryptoData[] = [];
 
   const page = await puppeteerService.newPage(proxy);
@@ -28,6 +97,10 @@ parentPort.on("message", async (data: WorkerInput) => {
 
   try {
     for (const link of links) {
+      if (aborted) {
+        console.log("[WORKER] aborted — stopping parse loop early");
+        break;
+      }
       try {
         const cryptoD = await parseCoinWithRetry(page, link);
         cryptoData.push(cryptoD);
@@ -51,8 +124,8 @@ parentPort.on("message", async (data: WorkerInput) => {
     await puppeteerService.closeBrowser(proxy);
   }
 
-  puppeteerService
-  parentPort.postMessage(cryptoData)
+  // Шлём результат и завершаемся естественно.
+  parentPort.postMessage(cryptoData);
 });
 
 async function parseCoinWithRetry(page: Page, link: string, attempts = 2): Promise<CryptoData> {

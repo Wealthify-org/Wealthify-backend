@@ -1,4 +1,4 @@
-import { Column, DataType, ForeignKey, Model, Table } from "sequelize-typescript";
+import { Column, DataType, ForeignKey, Model, Table, Index } from "sequelize-typescript";
 import { Portfolio } from "../portfolios/portfolios.model";
 import { TransactionType } from "@libs/contracts/common/enums/transaction-type.enum"
 import { ApiProperty } from "@nestjs/swagger";
@@ -12,7 +12,24 @@ interface TransactionCreationAttrs {
   date: Date
 }
 
-@Table({ tableName: 'transactions' })
+@Table({
+  tableName: 'transactions',
+  // Хот-индексы:
+  //  (portfolioId)              — `getAllPortfolioTransactions`, deletePortfolio cascade
+  //  (portfolioId, assetId)     — `handleSellTransactionDeletion` aggregate, removeAssetFromPortfolio
+  //  (portfolioId, assetId, type) — выборка только BUY-транзакций при пересчёте avg
+  indexes: [
+    { name: 'transactions_portfolio_id_idx', fields: ['portfolioId'] },
+    {
+      name: 'transactions_portfolio_asset_idx',
+      fields: ['portfolioId', 'assetId'],
+    },
+    {
+      name: 'transactions_portfolio_asset_type_idx',
+      fields: ['portfolioId', 'assetId', 'type'],
+    },
+  ],
+})
 export class Transaction extends Model<Transaction, TransactionCreationAttrs> {
 
   @ApiProperty({ example: 1, description: 'Уникальный идентификатор транзакции' })
@@ -25,6 +42,7 @@ export class Transaction extends Model<Transaction, TransactionCreationAttrs> {
   declare portfolioId: number
 
   @ApiProperty({ example: 5, description: 'ID актива, участвующего в транзакции' })
+  @Index('transactions_asset_id_idx')
   @Column({ type: DataType.INTEGER, allowNull: false })
   declare assetId: number
 

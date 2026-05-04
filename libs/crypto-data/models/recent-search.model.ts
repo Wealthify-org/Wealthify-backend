@@ -16,7 +16,17 @@ interface RecentSearchCreationAttrs {
 @Table({
   tableName: "recent_searches",
   timestamps: true,
-  updatedAt: false, 
+  updatedAt: false,
+  // — (userId, createdAt DESC) для `list` (последние N запросов юзера)
+  // — composite unique (userId, assetId) под upsert-pattern в `add()`
+  indexes: [
+    { name: "recent_searches_user_created_idx", fields: ["userId", "createdAt"] },
+    {
+      name: "recent_searches_user_asset_unique",
+      unique: true,
+      fields: ["userId", "assetId"],
+    },
+  ],
 })
 export class RecentSearch extends Model<RecentSearch, RecentSearchCreationAttrs> {
   @Column({

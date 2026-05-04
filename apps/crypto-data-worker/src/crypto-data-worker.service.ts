@@ -72,12 +72,33 @@ export class CryptoDataWorkerService {
       }
     }
 
+    // attributes: ограничиваем колонки (отбрасываем тяжёлый description).
+    // Include на Asset убран — в маппинге ниже он не использовался,
+    // а JOIN на каждый list-запрос — лишняя работа.
     const { rows, count } = await this.cryptoAssetRepo.findAndCountAll({
       where,
       limit,
       offset,
       order: [["rank", "ASC"]],
-      include: [{ model: this.assetRepo, required: false }],
+      attributes: [
+        "id",
+        "assetId",
+        "name",
+        "ticker",
+        "logoUrlLocal",
+        "rank",
+        "currentPriceUsd",
+        "change1HUsdPct",
+        "change24HUsdPct",
+        "change7DUsdPct",
+        "change30DUsdPct",
+        "change1YUsdPct",
+        "marketCapUsd",
+        "fdvUsd",
+        "volume24HUsd",
+        "sparkline7D",
+        "categories",
+      ],
     });
 
     const items = rows.map((row) => ({
@@ -130,8 +151,6 @@ export class CryptoDataWorkerService {
 
   async searchAssets(params: SearchAssetsParams): Promise<SearchAssetsHttpResponse> {
     const rawQuery = params.query?.trim();
-    console.log(`ENTERED - ${rawQuery}`)
-    this.log.log(`ENTERED - ${rawQuery}`)
     if (!rawQuery) {
       return { items: [] };
     }
@@ -141,14 +160,11 @@ export class CryptoDataWorkerService {
     const q = rawQuery;
     const ilike = `%${q}%`;
 
+    // SQL-injection-safe ORDER BY: вместо интерполяции пользовательского
+    // ввода в literal() — используем replacements (Sequelize escape'ит).
+    // Plus include на Asset убран (не использовался в маппинге ниже).
     const rows = await this.cryptoAssetRepo.findAll({
-      limit, 
-      include: [
-        {
-          model: this.assetRepo,
-          required: true,
-        },
-      ],
+      limit,
       where: {
         [Op.or]: [
           { ticker: { [Op.iLike]: ilike } },
@@ -159,18 +175,17 @@ export class CryptoDataWorkerService {
       },
       order: [
         [
-          literal(
-            `CASE 
-              WHEN "CryptoAssetData"."ticker" ILIKE '${q}' THEN 0
-              WHEN "CryptoAssetData"."ticker" ILIKE '${q}%' THEN 1
-              WHEN "CryptoAssetData"."contractAddress" ILIKE '${q}' THEN 2
-              ELSE 3
-            END`,
-          ),
+          literal(`CASE
+            WHEN "CryptoAssetData"."ticker" ILIKE :exact THEN 0
+            WHEN "CryptoAssetData"."ticker" ILIKE :prefix THEN 1
+            WHEN "CryptoAssetData"."contractAddress" ILIKE :exact THEN 2
+            ELSE 3
+          END`),
           "ASC",
         ],
         ["rank", "ASC"],
       ],
+      replacements: { exact: q, prefix: `${q}%` },
     });
 
     const items: SearchAssetDto[] = rows.map((row) => ({

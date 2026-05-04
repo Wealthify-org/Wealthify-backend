@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { CreateUserDto } from  '@libs/contracts';
 import { UsersService } from '../users/users.service';
 import * as bcrypt from 'bcryptjs'
+import * as crypto from 'crypto';
 import { InjectModel } from '@nestjs/sequelize';
 import { RefreshToken } from './refresh-token.model';
 import { ResetToken } from './reset-token-model';
@@ -20,6 +21,22 @@ import { rpcError } from '@libs/contracts/common/rpc/rpc-error';
 @Injectable()
 export class AuthService {
   private readonly hashComplexity: number = 10
+
+  /**
+   * Хешируем refresh/reset-токен через SHA256 (а не bcrypt).
+   *
+   * Почему: исходный токен — `uuidv4` (~122 бита энтропии), bruteforce
+   * против него бессмысленен → нам не нужен медленный bcrypt. SHA256
+   * детерминистичен и индексируем — `findOne({where:{token: hash}})`
+   * вместо `findAll + bcrypt.compare in loop` (бывшая O(N) на каждый
+   * /auth/refresh, который фронт зовёт на каждый page load).
+   *
+   * Для миграции: уже сохранённые в БД bcrypt-хеши после деплоя не
+   * совпадут с новым SHA256 — все активные сессии разлогинятся один раз.
+   */
+  private hashOpaqueToken(token: string): string {
+    return crypto.createHash("sha256").update(token).digest("hex");
+  }
 
   constructor (
     private userService: UsersService, 
@@ -63,19 +80,14 @@ export class AuthService {
       rpcError(HttpStatus.UNAUTHORIZED, 'NO_REFRESH', 'No refresh token');
     }
 
-    const rows = await this.refreshTokenRepository.findAll({
+    // O(1) lookup по SHA256-хешу — индекс есть на (token) + (expiryDate)
+    const hashed = this.hashOpaqueToken(refreshTokenPlain);
+    const matched = await this.refreshTokenRepository.findOne({
       where: {
+        token: hashed,
         expiryDate: { [Op.gte]: new Date() },
       },
-    })
-
-    let matched: RefreshToken | undefined
-    for (const row of rows) {
-      if (await bcrypt.compare(refreshTokenPlain, row.dataValues.token)) {
-        matched = row;
-        break;
-      }
-    }
+    });
 
     if (!matched) {
       rpcError(HttpStatus.UNAUTHORIZED, 'INVALID_REFRESH', 'Refresh token is invalid');
@@ -83,12 +95,22 @@ export class AuthService {
 
     const user = await this.userService.getUserById(matched.dataValues.userId)
     if (!user) {
-      rpcError(HttpStatus.INTERNAL_SERVER_ERROR, 'USER_NOT_FOUND', 'User not found');
+      // Если юзера удалили после выписки refresh-токена — это известный
+      // edge-case, но пользователю должно прилететь 401, а не 500. Иначе
+      // фронт показывает generic-ошибку и сессия зависает.
+      await matched.destroy().catch(() => {});
+      rpcError(
+        HttpStatus.UNAUTHORIZED,
+        'INVALID_REFRESH',
+        'Refresh token belongs to a non-existent user',
+      );
     }
 
-    await matched.destroy()
-
+    // Сначала генерируем новый токен, потом сносим старый — чтобы при
+    // ошибке генерации (JWT-sign) пользователь не остался без сессии.
     const tokens = await this.generateUserTokens(user)
+    await matched.destroy().catch(() => {});
+
     return { ...tokens, user: this.safeUser(user) }
   }
 
@@ -107,27 +129,26 @@ export class AuthService {
 
       return this.safeUser(user);
     } catch (err) {
+      // Не прокидываем `${err}` в сообщение пользователю — может содержать
+      // внутренние детали JWT (key id, algorithm). Логируем для отладки.
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[AuthService.authMe] verify failed: ${(err as Error)?.message ?? err}`,
+      );
       rpcError(
         HttpStatus.UNAUTHORIZED,
         'INVALID_ACCESS_TOKEN',
-        `Access token is invalid or expired - ${err}`,
-      )
+        'Access token is invalid or expired',
+      );
     }
   }
 
   async revokeRefreshToken(refreshTokenPlain: string) {
-    const rows = await this.refreshTokenRepository.findAll({
-      where: {
-        expiryDate: { [Op.gte]: new Date() },
-      },
-    })
-
-    for (const row of rows) {
-      if (await bcrypt.compare(refreshTokenPlain, row.dataValues.token)) {
-        await row.destroy()
-        return;
-      }
-    }
+    // O(1) — индексированный delete по SHA256-хешу
+    const hashed = this.hashOpaqueToken(refreshTokenPlain);
+    await this.refreshTokenRepository.destroy({
+      where: { token: hashed },
+    });
   }
 
   async changePassword(userId: number, changePasswordDto: ChangePasswordDto) {
@@ -156,11 +177,11 @@ export class AuthService {
       expiryDate.setHours(expiryDate.getHours() + 1)
 
       const resetToken = uuidv4()
-      const hashedResetToken = await bcrypt.hash(resetToken, this.hashComplexity)
+      const hashedResetToken = this.hashOpaqueToken(resetToken)
 
       await this.resetTokenRepository.upsert({
         userId: user.dataValues.id,
-        token: hashedResetToken, 
+        token: hashedResetToken,
         expiryDate
       })
 
@@ -172,9 +193,11 @@ export class AuthService {
 
   async resetPassword(resetPasswordDto: ResetPasswordDto) {
     const { resetToken, newPassword, userId } = resetPasswordDto
+    const hashed = this.hashOpaqueToken(resetToken);
     const tokenRow = await this.resetTokenRepository.findOne({
       where: {
         userId,
+        token: hashed,
         expiryDate: {
           [Op.gte]: new Date()
         }
@@ -182,11 +205,6 @@ export class AuthService {
     })
 
     if (!tokenRow) {
-      rpcError(HttpStatus.UNAUTHORIZED, 'INVALID_LINK', 'Invalid link');
-    }
-
-    const isTokensEqual = await bcrypt.compare(resetToken, tokenRow.dataValues.token)
-    if (!isTokensEqual) {
       rpcError(HttpStatus.UNAUTHORIZED, 'INVALID_LINK', 'Invalid link');
     }
 
@@ -211,8 +229,7 @@ export class AuthService {
     const accessToken = this.jwtService.sign(payload);
 
     const refreshToken = uuidv4()
-
-    const hashedRefreshToken = await bcrypt.hash(refreshToken, this.hashComplexity)
+    const hashedRefreshToken = this.hashOpaqueToken(refreshToken)
 
     await this.storeRefreshToken(hashedRefreshToken, user.dataValues.id)
 

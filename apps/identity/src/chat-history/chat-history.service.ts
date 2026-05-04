@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { InjectModel } from "@nestjs/sequelize";
+import { Op } from "sequelize";
 import { ChatMessage } from "./chat-message.model";
 import { ChatHistoryMessage, ChatHistoryRole } from "@libs/contracts";
 
@@ -54,21 +55,24 @@ export class ChatHistoryService {
   }
 
   private async trimHistory(userId: number): Promise<void> {
-    // оставляем последние HARD_LIMIT сообщений; остальные удаляем
-    const total = await this.repo.count({ where: { userId } });
-    if (total <= HISTORY_HARD_LIMIT_PER_USER) return;
-
-    const overflow = total - HISTORY_HARD_LIMIT_PER_USER;
-
-    const oldest = await this.repo.findAll({
+    // Один запрос вместо count + findAll + destroy:
+    //  – находим граничный id (HARD_LIMIT-й с конца) одним SELECT
+    //  – удаляем всё, что строго старше этого id
+    // Если у юзера ≤ HARD_LIMIT сообщений — boundary не найдётся, и мы выйдем.
+    const boundary = await this.repo.findOne({
       where: { userId },
-      order: [["id", "ASC"]],
-      limit: overflow,
+      order: [["id", "DESC"]],
+      offset: HISTORY_HARD_LIMIT_PER_USER - 1,
       attributes: ["id"],
     });
-    const ids = oldest.map((m) => m.id);
-    if (!ids.length) return;
-    await this.repo.destroy({ where: { id: ids } });
+    if (!boundary) return;
+
+    await this.repo.destroy({
+      where: {
+        userId,
+        id: { [Op.lt]: boundary.id },
+      },
+    });
   }
 
   private toDto(m: ChatMessage): ChatHistoryMessage {

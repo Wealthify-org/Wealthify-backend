@@ -40,7 +40,14 @@ export interface CryptoAssetCreationAttrs {
   lastUpdatedAt?: Date;
 }
 
-@Table({tableName: 'crypto_assets'})
+@Table({
+  tableName: 'crypto_assets',
+  // `listAssets` сортирует по rank ASC + offset/limit. Без индекса PG делает
+  // seq-scan + sort на сотни тысяч строк (с гипотетическим расширением).
+  indexes: [
+    { name: 'crypto_assets_rank_idx', fields: ['rank'] },
+  ],
+})
 export class CryptoAssetData extends Model<CryptoAssetData, CryptoAssetCreationAttrs> {
   @ApiProperty({ example: 1, description: 'ID актива' })
   @Column({ type: DataType.INTEGER, primaryKey: true, autoIncrement: true })

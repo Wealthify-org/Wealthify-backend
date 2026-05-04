@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { ClientProxy } from "@nestjs/microservices";
-import { lastValueFrom } from "rxjs";
+import { lastValueFrom, timeout } from "rxjs";
 
 import {
   OpenRouterJsonSchema,
@@ -344,8 +344,12 @@ export class RecommendationsService {
     targetAllocation: RiskProfileSnapshot["targetAllocation"];
   } | null> {
     try {
+      // 5с timeout — без него висящий identity-MS блокирует генерацию
+      // рекомендаций до 45с (gateway timeout) → user видит 504.
       const result = await lastValueFrom(
-        this.identityMs.send(RISK_PROFILE_PATTERNS.GET_BY_USER, { userId }),
+        this.identityMs
+          .send(RISK_PROFILE_PATTERNS.GET_BY_USER, { userId })
+          .pipe(timeout(5_000)),
       );
       // result null если пользователь ещё не проходил тест
       if (!result || !result.bucket) return null;

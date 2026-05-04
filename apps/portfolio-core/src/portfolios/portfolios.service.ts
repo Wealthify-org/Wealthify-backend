@@ -1,7 +1,14 @@
-import { HttpStatus, Injectable, Inject } from "@nestjs/common";
-import { InjectModel } from "@nestjs/sequelize";
+import { HttpStatus, Injectable, Inject, Logger } from "@nestjs/common";
+import { InjectModel, InjectConnection } from "@nestjs/sequelize";
 import { ClientProxy } from "@nestjs/microservices";
-import { lastValueFrom } from "rxjs";
+import { catchError, lastValueFrom, of, timeout } from "rxjs";
+import { Sequelize } from "sequelize-typescript";
+
+/** Таймаут для RPC до соседнего микросервиса. Без него каждый зависший
+ *  peer (assets / identity) блокирует HTTP-запрос в gateway навсегда. */
+const RPC_TIMEOUT_MS = 5_000;
+
+const rpcLog = new Logger('PortfoliosService.RPC');
 
 import { Portfolio } from "./portfolios.model";
 import { AssetType, CreatePortfolioDto } from "@libs/contracts";
@@ -24,6 +31,7 @@ interface AssetWithData {
     change24HUsdPct?: number | null;
     logoUrlLocal?: string | null;
     categories?: string | null;
+    sparkline7D?: { prices?: number[] | null } | null;
   };
 }
 
@@ -38,6 +46,8 @@ export class PortfoliosService {
     private readonly transactionRepository: typeof Transaction,
     @Inject(ASSETS_CLIENT)
     private readonly assetsClient: ClientProxy,
+    @InjectConnection()
+    private readonly sequelize: Sequelize,
   ) {}
 
   async createPortfolio(dto: CreatePortfolioDto) {
@@ -59,12 +69,26 @@ export class PortfoliosService {
   ): Promise<Map<number, AssetWithData>> {
     if (!assetIds.length) return new Map();
 
-    const assets = (await lastValueFrom(
-      this.assetsClient.send<AssetWithData[]>(
-        ASSETS_PATTERNS.GET_MANY_BY_IDS,
-        { ids: assetIds },
-      ),
-    )) ?? [];
+    // RPC c timeout — раньше зависший assets-MS навсегда блокировал
+    // page-load. Теперь через 5с возвращаем пустой массив (UI покажет
+    // позиции с нулевой стоимостью вместо вечной загрузки), но логируем
+    // ошибку.
+    const assets =
+      (await lastValueFrom(
+        this.assetsClient
+          .send<AssetWithData[]>(ASSETS_PATTERNS.GET_MANY_BY_IDS, {
+            ids: assetIds,
+          })
+          .pipe(
+            timeout(RPC_TIMEOUT_MS),
+            catchError((err) => {
+              rpcLog.error(
+                `assets-MS GET_MANY_BY_IDS failed: ${(err as Error)?.message ?? err}`,
+              );
+              return of<AssetWithData[]>([]);
+            }),
+          ),
+      )) ?? [];
 
     const map = new Map<number, AssetWithData>();
     for (const asset of assets) {
@@ -74,8 +98,11 @@ export class PortfoliosService {
   }
 
   async getAllPortfolios(userId: number) {
+    // Один запрос вместо двух: подтягиваем portfolio + positions через include.
+    // Раньше было findAll(portfolios) → findAll(portfolio_assets where IN ids).
     const portfolios = await this.portfolioRepository.findAll({
       where: { userId },
+      include: [{ model: PortfolioAssets, required: false }],
     });
 
     if (portfolios.length === 0) {
@@ -87,11 +114,10 @@ export class PortfoliosService {
       };
     }
 
-    const portfolioIds = portfolios.map((p) => p.id);
-
-    const rows = await this.portfolioAssetsRepository.findAll({
-      where: { portfolioId: portfolioIds },
-    });
+    // Все portfolio_assets из всех портфелей собираем в плоский массив
+    const rows: PortfolioAssets[] = portfolios.flatMap(
+      (p) => ((p as any).portfolioAssets as PortfolioAssets[]) ?? [],
+    );
 
     const assetIds = Array.from(
       new Set(rows.map((row) => row.assetId).filter((id): id is number => !!id)),
@@ -99,7 +125,19 @@ export class PortfoliosService {
 
     const assetsMap = await this.getAssetsMapByIds(assetIds);
 
-    const byPortfolio = new Map<number, { totalNow: number; total24hAgo: number }>();
+    const byPortfolio = new Map<
+      number,
+      {
+        totalNow: number;
+        total24hAgo: number;
+        // Sparkline-серия портфеля: для каждого индекса i накапливаем
+        // sum(asset.sparkline7D.prices[i] * quantity). Длина итоговой
+        // серии — минимальная среди всех активов портфеля (берём по
+        // самому короткому ряду, чтобы не было undefined).
+        sparkline: number[];
+        sparklineLen: number;
+      }
+    >();
 
     for (const row of rows) {
       const portfolioId = row.portfolioId;
@@ -134,20 +172,57 @@ export class PortfoliosService {
       }
 
       const bucket =
-        byPortfolio.get(portfolioId) ?? { totalNow: 0, total24hAgo: 0 };
+        byPortfolio.get(portfolioId) ?? {
+          totalNow: 0,
+          total24hAgo: 0,
+          sparkline: [],
+          sparklineLen: Number.POSITIVE_INFINITY,
+        };
 
       bucket.totalNow += valueNow;
       bucket.total24hAgo += value24hAgo;
+
+      // Накапливаем sparkline. Для USD/FIAT линия ровная — добавляем
+      // константу `valueNow` на каждой точке (если уже есть длина серии).
+      const prices: number[] | null =
+        asset.type === AssetType.FIAT && asset.ticker === "USD"
+          ? null
+          : data?.sparkline7D?.prices ?? null;
+
+      if (prices && prices.length > 0) {
+        // первое расширение массива до длины серии
+        if (bucket.sparkline.length < prices.length) {
+          while (bucket.sparkline.length < prices.length) {
+            bucket.sparkline.push(0);
+          }
+        }
+        const usableLen = Math.min(bucket.sparkline.length, prices.length);
+        for (let i = 0; i < usableLen; i++) {
+          bucket.sparkline[i] += prices[i] * quantity;
+        }
+        // Если этот актив короче — обрезаем итог до его длины (не было
+        // данных). Для согласованности всех точек портфеля.
+        if (prices.length < bucket.sparklineLen) {
+          bucket.sparklineLen = prices.length;
+        }
+      }
+
       byPortfolio.set(portfolioId, bucket);
     }
 
     const valuesUsd: number[] = [];
     const change24hAbsUsd: number[] = [];
     const change24hPct: number[] = [];
+    const sparklines7d: number[][] = [];
 
     for (const portfolio of portfolios) {
       const stats =
-        byPortfolio.get(portfolio.id) ?? { totalNow: 0, total24hAgo: 0 };
+        byPortfolio.get(portfolio.id) ?? {
+          totalNow: 0,
+          total24hAgo: 0,
+          sparkline: [],
+          sparklineLen: 0,
+        };
 
       const totalNow = stats.totalNow;
       const total24hAgo = stats.total24hAgo;
@@ -158,6 +233,11 @@ export class PortfoliosService {
       valuesUsd.push(totalNow);
       change24hAbsUsd.push(abs);
       change24hPct.push(pct);
+
+      const len = Number.isFinite(stats.sparklineLen)
+        ? Math.min(stats.sparkline.length, stats.sparklineLen)
+        : stats.sparkline.length;
+      sparklines7d.push(stats.sparkline.slice(0, len));
     }
 
     return {
@@ -165,11 +245,16 @@ export class PortfoliosService {
       valuesUsd,
       change24hAbsUsd,
       change24hPct,
+      sparklines7d,
     };
   }
 
   async getPortfolioDetailById(id: number, userId: number) {
-    const portfolio = await this.portfolioRepository.findByPk(id);
+    // Один запрос вместо двух: подтягиваем portfolio + его positions через
+    // include. Раньше было findByPk → findAll(portfolio_assets) sequential.
+    const portfolio = await this.portfolioRepository.findByPk(id, {
+      include: [{ model: PortfolioAssets, required: false }],
+    });
 
     if (!portfolio) {
       rpcError(
@@ -187,9 +272,11 @@ export class PortfoliosService {
       );
     }
 
-    const rows = await this.portfolioAssetsRepository.findAll({
-      where: { portfolioId: id },
-    });
+    // include вернул rows внутри portfolio.<association-key>; имя association по
+    // умолчанию = camelCase plural имени модели → "portfolioAssets". Безопасно
+    // достаём через any, чтобы не зависеть от @HasMany decorator на Portfolio.
+    const rows: PortfolioAssets[] =
+      ((portfolio as any).portfolioAssets as PortfolioAssets[]) ?? [];
 
     const assetIds = Array.from(
       new Set(rows.map((r) => r.assetId).filter((x): x is number => !!x)),
@@ -281,11 +368,12 @@ export class PortfoliosService {
     };
   }
 
-  async getPortfolioByName(name: string) {
+  async getPortfolioByName(name: string, userId: number) {
+    // userId — обязателен. Раньше сюда искалось по имени глобально, что
+    // позволяло любому залогиненному пользователю прочитать чужой портфель
+    // с активами и транзакциями (IDOR).
     const portfolio = await this.portfolioRepository.findOne({
-      where: { name },
-      include: { all: true, nested: true },
-      nest: true,
+      where: { name, userId },
     });
 
     if (!portfolio) {
@@ -379,8 +467,10 @@ export class PortfoliosService {
     };
   }
 
-  async deletePortfolio(id: number) {
-    const portfolio = await this.portfolioRepository.findByPk(id);
+  async deletePortfolio(id: number, userId: number) {
+    const portfolio = await this.portfolioRepository.findByPk(id, {
+      attributes: ["id", "userId"],
+    });
 
     if (!portfolio) {
       rpcError(
@@ -390,9 +480,35 @@ export class PortfoliosService {
       );
     }
 
-    await this.transactionRepository.destroy({ where: { portfolioId: id } });
-    await this.portfolioAssetsRepository.destroy({ where: { portfolioId: id } });
-    await this.portfolioRepository.destroy({ where: { id } });
+    // Ownership-check — раньше любой залогиненный мог удалить ЛЮБОЙ
+    // портфель с его транзакциями и активами (катастрофический IDOR).
+    if (portfolio.userId !== userId) {
+      rpcError(
+        HttpStatus.FORBIDDEN,
+        "PORTFOLIO_FORBIDDEN",
+        `Portfolio ${id} doesn't belong to user ${userId}`,
+      );
+    }
+
+    // Атомарное удаление: транзакции и portfolio_assets независимы — удаляем
+    // их параллельно внутри одной DB-транзакции, потом сам портфель.
+    // Если что-то упадёт — DB откатит всё, не получим частичного состояния.
+    await this.sequelize.transaction(async (t) => {
+      await Promise.all([
+        this.transactionRepository.destroy({
+          where: { portfolioId: id },
+          transaction: t,
+        }),
+        this.portfolioAssetsRepository.destroy({
+          where: { portfolioId: id },
+          transaction: t,
+        }),
+      ]);
+      await this.portfolioRepository.destroy({
+        where: { id },
+        transaction: t,
+      });
+    });
 
     return { message: `Portfolio ${id} was successfully deleted` };
   }

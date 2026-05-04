@@ -1,47 +1,60 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
-import { CreateRoleDto } from  '@libs/contracts';
+import { HttpStatus, Injectable } from '@nestjs/common';
+import { CreateRoleDto } from '@libs/contracts';
 import { Role } from './roles.model';
 import { InjectModel } from '@nestjs/sequelize';
+import { rpcError } from '@libs/contracts/common';
 
 @Injectable()
 export class RolesService {
   constructor(@InjectModel(Role) private roleRepository: typeof Role) {}
 
   async createRole(dto: CreateRoleDto) {
-    const { value } = dto
-    const foundRole = await this.roleRepository.findOne({ where: { value } })
+    const { value } = dto;
+    const foundRole = await this.roleRepository.findOne({ where: { value } });
     if (foundRole) {
-      throw new HttpException(`Role with value ${value} already exists`, HttpStatus.BAD_REQUEST)
+      // Раньше был throw new HttpException — но это RPC-микросервис, там
+      // нужен RpcException через rpcError(), иначе caller получает
+      // BAD_GATEWAY вместо нашего {status, code, message}.
+      rpcError(
+        HttpStatus.CONFLICT,
+        'ROLE_EXISTS',
+        `Role with value ${value} already exists`,
+      );
     }
 
-    const role = await this.roleRepository.create(dto)
-    return role
+    const role = await this.roleRepository.create(dto);
+    return role;
   }
 
   async getRoleByValue(value: string) {
-    const role = await this.roleRepository.findOne({ where: { value } })
+    const role = await this.roleRepository.findOne({ where: { value } });
     if (!role) {
-      throw new HttpException(`Role with value ${value} doesn\'t exist`, HttpStatus.NOT_FOUND)
+      rpcError(
+        HttpStatus.NOT_FOUND,
+        'ROLE_NOT_FOUND',
+        `Role with value ${value} doesn't exist`,
+      );
     }
-    
-    return role
+
+    return role;
   }
 
   async getAllRoles() {
-    const roles = await this.roleRepository.findAll()
-    
-    return roles
+    return this.roleRepository.findAll();
   }
 
   async deleteRoleByValue(value: string) {
-    const role = await this.roleRepository.findOne({ where: { value } })
+    const role = await this.roleRepository.findOne({ where: { value } });
     if (!role) {
-      throw new HttpException(`Role with value ${value} doesn\'t exist`, HttpStatus.NOT_FOUND)
+      rpcError(
+        HttpStatus.NOT_FOUND,
+        'ROLE_NOT_FOUND',
+        `Role with value ${value} doesn't exist`,
+      );
     }
 
-    await role.destroy()
+    await role.destroy();
 
-    return { message: `Role with value ${value} was successfully deleted` }
+    return { message: `Role with value ${value} was successfully deleted` };
   }
-
 }

@@ -14,12 +14,15 @@ export class TransactionsController {
   }
 
   @MessagePattern(TRANSACTIONS_PATTERNS.FIND_ALL_BY_PORTFOLIO)
-  getAllPortfolioTransactions(@Payload() payload: { id: number }) {
-    return this.transactionService.getAllPortfolioTransactions(payload.id);
+  getAllPortfolioTransactions(@Payload() payload: { id: number; userId: number }) {
+    return this.transactionService.getAllPortfolioTransactions(
+      payload.id,
+      payload.userId,
+    );
   }
 
   @MessagePattern(TRANSACTIONS_PATTERNS.DELETE_BY_ID)
-  delete(@Payload() payload: { id: number }) {
-    return this.transactionService.deleteTransaction(payload.id)
+  delete(@Payload() payload: { id: number; userId: number }) {
+    return this.transactionService.deleteTransaction(payload.id, payload.userId)
   }
 }

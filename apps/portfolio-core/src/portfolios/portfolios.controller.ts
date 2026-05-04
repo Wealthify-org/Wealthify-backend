@@ -19,8 +19,8 @@ export class PortfoliosController {
   }
 
   @MessagePattern(PORTFOLIOS_PATTERNS.FIND_BY_NAME)
-  getByName(@Payload() payload: {name: string}) {
-    return this.portfolioService.getPortfolioByName(payload.name)
+  getByName(@Payload() payload: { name: string; userId: number }) {
+    return this.portfolioService.getPortfolioByName(payload.name, payload.userId)
   }
 
   @MessagePattern(PORTFOLIOS_PATTERNS.FIND_DETAIL_BY_ID)
@@ -34,7 +34,7 @@ export class PortfoliosController {
   }
 
   @MessagePattern(PORTFOLIOS_PATTERNS.DELETE_BY_ID)
-  delete(@Payload() payload: {id: number}) {
-    return this.portfolioService.deletePortfolio(payload.id)
+  delete(@Payload() payload: { id: number; userId: number }) {
+    return this.portfolioService.deletePortfolio(payload.id, payload.userId)
   }
 }

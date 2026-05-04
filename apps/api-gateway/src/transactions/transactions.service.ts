@@ -13,11 +13,17 @@ export class TransactionsService {
     return sendOrThrow(this.appMs, TRANSACTIONS_PATTERNS.FIND_ALL, {});
   }
 
-  getAllPortfolioTransactions(portfolioId: number) {
-    return sendOrThrow(this.appMs, TRANSACTIONS_PATTERNS.FIND_ALL_BY_PORTFOLIO, { id: portfolioId });
+  getAllPortfolioTransactions(portfolioId: number, userId: number) {
+    return sendOrThrow(this.appMs, TRANSACTIONS_PATTERNS.FIND_ALL_BY_PORTFOLIO, {
+      id: portfolioId,
+      userId,
+    });
   }
 
-  deleteTransaction(id: number) {
-    return sendOrThrow(this.appMs, TRANSACTIONS_PATTERNS.DELETE_BY_ID, { id });
+  deleteTransaction(id: number, userId: number) {
+    return sendOrThrow(this.appMs, TRANSACTIONS_PATTERNS.DELETE_BY_ID, {
+      id,
+      userId,
+    });
   }
 }

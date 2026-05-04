@@ -27,6 +27,8 @@ import { RecommendationsModule } from './recommendations/recommendations.module'
       models: [Portfolio, Transaction, PortfolioAssets],
       autoLoadModels: true,
       synchronize: true,
+      // sync:alter подхватит @Index/composite-unique декораторы при бутстрапе
+      sync: { alter: true },
     }),
     PortfoliosModule,
     TransactionsModule,

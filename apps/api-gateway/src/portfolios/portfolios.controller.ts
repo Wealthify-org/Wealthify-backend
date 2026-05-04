@@ -42,11 +42,14 @@ export class PortfoliosController {
 
   @Get('/name/:name')
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Получить портфель по названию' })
+  @ApiOperation({ summary: 'Получить портфель текущего пользователя по названию' })
   @ApiParam({ name: 'name', example: 'Crypto Portfolio', description: 'Название портфеля' })
   @ApiResponse({ status: 200, description: 'Портфель найден или сообщение об отсутствии' })
-  getByName(@Param('name') name: string) {
-    return this.portfolios.getPortfolioByName(name);
+  getByName(@Param('name') name: string, @CurrentUser('id') userId: number) {
+    // Передаём userId, чтобы сервис ограничил поиск только портфелями
+    // вызывающего пользователя (раньше был IDOR — любой залогиненный
+    // мог получить чужой портфель по имени).
+    return this.portfolios.getPortfolioByName(name, userId);
   }
 
   @Get('/summary/me')
@@ -74,12 +77,14 @@ export class PortfoliosController {
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Удалить портфель по ID' })
+  @ApiOperation({ summary: 'Удалить портфель по ID (только свой)' })
   @ApiParam({ name: 'id', example: 5, description: 'ID портфеля' })
   @ApiResponse({ status: 200, description: 'Портфель успешно удалён' })
+  @ApiResponse({ status: 403, description: 'Чужой портфель' })
   @ApiResponse({ status: 404, description: 'Портфель не найден' })
-  delete(@Param('id') id: string) {
-    return this.portfolios.deletePortfolio(Number(id));
+  delete(@Param('id') id: string, @CurrentUser('id') userId: number) {
+    // Передаём userId — сервис проверит ownership перед destroy.
+    return this.portfolios.deletePortfolio(Number(id), userId);
   }
 
   @Get(':id/recommendations')

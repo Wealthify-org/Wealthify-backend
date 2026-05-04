@@ -1,4 +1,4 @@
-import { Column, DataType, Table, Model, BelongsToMany, ForeignKey, HasMany } from "sequelize-typescript";
+import { Column, DataType, Table, Model, BelongsToMany, ForeignKey, HasMany, Index } from "sequelize-typescript";
 import { PortfolioAssets } from "../portfolio-assets/portfolio-assets.model";
 import { Transaction } from "../transactions/transactions.model";
 import { PortfolioType } from "../../../../libs/contracts/src/common/enums/portfolio-type.enum";
@@ -10,7 +10,19 @@ interface PortfolioCreationAttrs {
   userId: number 
 }
 
-@Table({tableName: 'portfolios'}) 
+@Table({
+  tableName: 'portfolios',
+  // Композитный уникальный индекс — один и тот же пользователь не может
+  // иметь два портфеля с одинаковым именем. Это и заменяет проверку
+  // findOne+create в сервисе, и даёт быстрый поиск по имени.
+  indexes: [
+    {
+      name: 'portfolios_user_name_unique',
+      unique: true,
+      fields: ['userId', 'name'],
+    },
+  ],
+})
 export class Portfolio extends Model<Portfolio, PortfolioCreationAttrs> {
   @ApiProperty({ example: 1, description: 'Уникальный идентификатор портфеля' })
   @Column({type: DataType.INTEGER, unique: true, autoIncrement: true, primaryKey: true})
@@ -18,8 +30,8 @@ export class Portfolio extends Model<Portfolio, PortfolioCreationAttrs> {
 
   @ApiProperty({ example: 'Crypto Portfolio', description: 'Название портфеля' })
   @Column({type: DataType.STRING, unique: false, allowNull: false})
-  declare name: string 
-  
+  declare name: string
+
   @ApiProperty({ example: 'Crypto', enum: PortfolioType, description: 'Тип портфеля: Crypto, Stock или Bond' })
   @Column({type: DataType.ENUM(...Object.values(PortfolioType)), allowNull: false})
   declare type: PortfolioType
@@ -29,10 +41,15 @@ export class Portfolio extends Model<Portfolio, PortfolioCreationAttrs> {
   // declare assets: Asset[]
 
   @ApiProperty({ example: 7, description: 'ID пользователя-владельца портфеля' })
+  @Index('portfolios_user_id_idx')
   @Column({type: DataType.INTEGER, allowNull: false})
   declare userId: number
 
   @ApiProperty({ type: [Transaction], description: 'Список транзакций, связанных с этим портфелем', required: false })
   @HasMany(() => Transaction)
   declare transactions: Transaction[]
+
+  @ApiProperty({ type: [PortfolioAssets], description: 'Позиции в портфеле', required: false })
+  @HasMany(() => PortfolioAssets)
+  declare portfolioAssets: PortfolioAssets[]
 }

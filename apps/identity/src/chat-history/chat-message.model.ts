@@ -16,7 +16,16 @@ interface ChatMessageCreationAttrs {
   content: string;
 }
 
-@Table({ tableName: "chat_messages", timestamps: true, updatedAt: false })
+@Table({
+  tableName: "chat_messages",
+  timestamps: true,
+  updatedAt: false,
+  // (userId, id DESC) — `getRecent` (последние N), `count`, `trim`, `destroy by userId`.
+  // Без индекса PG делает seq-scan по всей таблице чата.
+  indexes: [
+    { name: "chat_messages_user_id_idx", fields: ["userId", "id"] },
+  ],
+})
 export class ChatMessage extends Model<ChatMessage, ChatMessageCreationAttrs> {
   @ApiProperty({ example: 1, description: "Уникальный ID сообщения" })
   @Column({

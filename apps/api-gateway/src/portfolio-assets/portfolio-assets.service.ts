@@ -16,27 +16,29 @@ export class PortfolioAssetsService {
     @Inject(PORTFOLIO_CLIENT) private readonly portfolioMs: ClientProxy,
   ) {}
 
-  addAssetToPortfolio(dto: AddAssetToPortfolioDto) {
+  addAssetToPortfolio(dto: AddAssetToPortfolioDto, userId: number) {
+    // userId примешивается gateway'ем из JWT и проверяется на стороне
+    // portfolio-core (ownership-check). DTO от клиента userId не несёт.
     return sendOrThrow(
       this.portfolioMs,
       PORTFOLIO_ASSETS_PATTERNS.ADD_TO_PORTFOLIO,
-      dto,
+      { ...dto, userId },
     );
   }
 
-  sellAsset(dto: SellAssetDto) {
+  sellAsset(dto: SellAssetDto, userId: number) {
     return sendOrThrow(
       this.portfolioMs,
       PORTFOLIO_ASSETS_PATTERNS.SELL_FROM_PORTFOLIO,
-      dto,
+      { ...dto, userId },
     );
   }
 
-  removeAssetFromPortfolio(dto: RemoveAssetFromPortfolioDto) {
+  removeAssetFromPortfolio(dto: RemoveAssetFromPortfolioDto, userId: number) {
     return sendOrThrow(
       this.portfolioMs,
       PORTFOLIO_ASSETS_PATTERNS.REMOVE_FROM_PORTFOLIO,
-      dto,
+      { ...dto, userId },
     );
   }
 }

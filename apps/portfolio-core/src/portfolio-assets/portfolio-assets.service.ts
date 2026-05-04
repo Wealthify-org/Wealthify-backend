@@ -1,7 +1,10 @@
-import { HttpStatus, Inject, Injectable } from "@nestjs/common";
+import { HttpStatus, Inject, Injectable, Logger } from "@nestjs/common";
 import { InjectModel } from "@nestjs/sequelize";
 import { ClientProxy } from "@nestjs/microservices";
-import { lastValueFrom } from "rxjs";
+import { catchError, lastValueFrom, of, throwError, timeout } from "rxjs";
+
+const RPC_TIMEOUT_MS = 5_000;
+const rpcLog = new Logger("PortfolioAssetsService.RPC");
 
 import { PortfolioAssets } from "./portfolio-assets.model";
 import { Portfolio } from "../portfolios/portfolios.model";
@@ -36,15 +39,24 @@ export class PortfolioAssetsService {
     private readonly assetsClient: ClientProxy,
   ) {}
 
-  private async getAssetByTickerOrThrow(
-    ticker: string,
-  ): Promise<AssetDto> {
+  private async getAssetByTickerOrThrow(ticker: string): Promise<AssetDto> {
+    // Раньше lastValueFrom без timeout — каждый сбой assets-MS вешал
+    // mutation-flow клиента. Теперь — 5с timeout + структурированная RPC-ошибка.
     const asset = await lastValueFrom(
-      this.assetsClient.send<AssetDto | null>(
-        ASSETS_PATTERNS.GET_BY_TICKER,
-        { ticker },
-      ),
-    );
+      this.assetsClient
+        .send<AssetDto | null>(ASSETS_PATTERNS.GET_BY_TICKER, { ticker })
+        .pipe(
+          timeout(RPC_TIMEOUT_MS),
+          catchError((err) => {
+            rpcLog.error(
+              `assets-MS GET_BY_TICKER(${ticker}) failed: ${(err as Error)?.message ?? err}`,
+            );
+            return throwError(() =>
+              new Error("ASSETS_SERVICE_UNAVAILABLE"),
+            );
+          }),
+        ),
+    ).catch(() => null);
 
     if (!asset) {
       rpcError(
@@ -59,34 +71,56 @@ export class PortfolioAssetsService {
 
   private async ensureUsdAsset(): Promise<AssetDto> {
     let usd = await lastValueFrom(
-      this.assetsClient.send<AssetDto | null>(
-        ASSETS_PATTERNS.GET_BY_TICKER,
-        { ticker: "USD" },
-      ),
+      this.assetsClient
+        .send<AssetDto | null>(ASSETS_PATTERNS.GET_BY_TICKER, {
+          ticker: "USD",
+        })
+        .pipe(
+          timeout(RPC_TIMEOUT_MS),
+          catchError((err) => {
+            rpcLog.error(
+              `assets-MS GET_BY_TICKER(USD) failed: ${(err as Error)?.message ?? err}`,
+            );
+            return of<AssetDto | null>(null);
+          }),
+        ),
     );
 
     if (!usd) {
       usd = await lastValueFrom(
-        this.assetsClient.send<AssetDto>(
-          ASSETS_PATTERNS.CREATE,
-          {
+        this.assetsClient
+          .send<AssetDto>(ASSETS_PATTERNS.CREATE, {
             name: "US Dollar",
             ticker: "USD",
             type: AssetType.FIAT,
-          },
-        ),
+          })
+          .pipe(timeout(RPC_TIMEOUT_MS)),
+      );
+    }
+
+    if (!usd) {
+      rpcError(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        "USD_ASSET_UNAVAILABLE",
+        "Failed to ensure USD asset",
       );
     }
 
     return usd;
   }
 
-  async addAssetToPortfolio(dto: AddAssetToPortfolioDto) {
-    const { portfolioId, assetTicker, quantity, purchasePrice } = dto;
-
-    const asset = await this.getAssetByTickerOrThrow(assetTicker);
-
-    const portfolio = await this.portfolioRepository.findByPk(portfolioId);
+  /**
+   * Проверяет, что портфель существует и принадлежит вызывающему пользователю.
+   * Раньше операции add/sell/remove не проверяли ownership — любой залогиненный
+   * пользователь мог мутировать чужие портфели по id.
+   */
+  private async assertPortfolioOwnedByUser(
+    portfolioId: number,
+    userId: number,
+  ): Promise<void> {
+    const portfolio = await this.portfolioRepository.findByPk(portfolioId, {
+      attributes: ["id", "userId"],
+    });
     if (!portfolio) {
       rpcError(
         HttpStatus.NOT_FOUND,
@@ -94,6 +128,21 @@ export class PortfolioAssetsService {
         `Portfolio ${portfolioId} not found`,
       );
     }
+    if (portfolio.userId !== userId) {
+      rpcError(
+        HttpStatus.FORBIDDEN,
+        "PORTFOLIO_FORBIDDEN",
+        `Portfolio ${portfolioId} doesn't belong to user ${userId}`,
+      );
+    }
+  }
+
+  async addAssetToPortfolio(dto: AddAssetToPortfolioDto, userId: number) {
+    const { portfolioId, assetTicker, quantity, purchasePrice } = dto;
+
+    await this.assertPortfolioOwnedByUser(portfolioId, userId);
+
+    const asset = await this.getAssetByTickerOrThrow(assetTicker);
 
     if (quantity <= 0) {
       rpcError(
@@ -153,7 +202,7 @@ export class PortfolioAssetsService {
     return portfolioAsset;
   }
 
-  async sellAsset(dto: SellAssetDto) {
+  async sellAsset(dto: SellAssetDto, userId: number) {
     const {
       portfolioId,
       assetTicker,
@@ -162,16 +211,9 @@ export class PortfolioAssetsService {
       pricePerUnit,
     } = dto;
 
-    const asset = await this.getAssetByTickerOrThrow(assetTicker);
+    await this.assertPortfolioOwnedByUser(portfolioId, userId);
 
-    const portfolio = await this.portfolioRepository.findByPk(portfolioId);
-    if (!portfolio) {
-      rpcError(
-        HttpStatus.NOT_FOUND,
-        "PORTFOLIO_NOT_FOUND",
-        `Portfolio ${portfolioId} not found`,
-      );
-    }
+    const asset = await this.getAssetByTickerOrThrow(assetTicker);
 
     let portfolioAsset = await this.portfolioAssetRepository.findOne({
       where: { portfolioId, assetId: asset.id },
@@ -221,12 +263,15 @@ export class PortfolioAssetsService {
 
       const usdAsset = await this.ensureUsdAsset();
 
-      await this.addAssetToPortfolio({
-        portfolioId,
-        assetTicker: usdAsset.ticker,
-        quantity: usdAmount,
-        purchasePrice: 1,
-      });
+      await this.addAssetToPortfolio(
+        {
+          portfolioId,
+          assetTicker: usdAsset.ticker,
+          quantity: usdAmount,
+          purchasePrice: 1,
+        },
+        userId,
+      );
     }
 
     await this.transactionsService.createTransaction({
@@ -243,9 +288,11 @@ export class PortfolioAssetsService {
 
   async removeAssetFromPortfolio(
     dto: RemoveAssetFromPortfolioDto,
+    userId: number,
   ) {
-    const { portfolioId, assetTicker, removeAllLinkedTransactions } =
-      dto;
+    const { portfolioId, assetTicker, removeAllLinkedTransactions } = dto;
+
+    await this.assertPortfolioOwnedByUser(portfolioId, userId);
 
     const asset = await this.getAssetByTickerOrThrow(assetTicker);
 

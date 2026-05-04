@@ -7,11 +7,13 @@ export const CreateTransactionSchema = z
     portfolioId: z
       .coerce.number()
       .int()
+      .positive()
       .describe('ID портфеля, к которому относится транзакция'),
 
     assetId: z
       .coerce.number()
       .int()
+      .positive()
       .describe('ID актива, связанного с транзакцией'),
 
     type: z
@@ -20,10 +22,14 @@ export const CreateTransactionSchema = z
 
     quantity: z
       .coerce.number()
+      .finite()
+      .positive('quantity must be greater than 0')
       .describe('Количество актива, участвующее в транзакции'),
 
     pricePerUnit: z
       .coerce.number()
+      .finite()
+      .nonnegative('pricePerUnit must be ≥ 0')
       .describe('Цена за единицу актива на момент транзакции (в USD)'),
 
     date: z

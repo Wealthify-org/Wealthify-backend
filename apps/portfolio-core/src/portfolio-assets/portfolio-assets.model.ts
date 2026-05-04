@@ -1,4 +1,4 @@
-import { Model, Column, DataType, ForeignKey, Table, BelongsTo } from "sequelize-typescript";
+import { Model, Column, DataType, ForeignKey, Table, BelongsTo, Index } from "sequelize-typescript";
 import { Portfolio } from "../portfolios/portfolios.model";
 import { ApiProperty } from "@nestjs/swagger";
 
@@ -9,13 +9,30 @@ interface PortfolioAssetCreationAttrs {
   averageBuyPrice: number
 }
 
-@Table({tableName: 'portfolio_assets', createdAt: false, updatedAt: false}) 
+@Table({
+  tableName: 'portfolio_assets',
+  createdAt: false,
+  updatedAt: false,
+  // Композитный уникальный индекс: один и тот же актив не может быть
+  // дважды в одном портфеле. Это поддерживает логику service.addAssetToPortfolio
+  // (он делает findOne→update vs create) и даёт быстрый join по (portfolioId, assetId).
+  // Plus B-tree on portfolioId для cascade-deletes и enrichment-фильтра.
+  indexes: [
+    { name: 'portfolio_assets_portfolio_id_idx', fields: ['portfolioId'] },
+    {
+      name: 'portfolio_assets_portfolio_asset_unique',
+      unique: true,
+      fields: ['portfolioId', 'assetId'],
+    },
+  ],
+})
 export class PortfolioAssets extends Model<PortfolioAssets, PortfolioAssetCreationAttrs> {
   @ApiProperty({ example: 1, description: 'Уникальный идентификатор записи связи между активом и портфелем' })
   @Column({type: DataType.INTEGER, unique: true, autoIncrement: true, primaryKey: true})
   declare id: number
 
   @ApiProperty({ example: 3, description: 'ID актива (внешний ключ на таблицу assets)' })
+  @Index('portfolio_assets_asset_id_idx')
   @Column({type: DataType.INTEGER})
   declare assetId: number
 

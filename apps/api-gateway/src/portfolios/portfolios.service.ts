@@ -18,8 +18,11 @@ export class PortfoliosService {
     return sendOrThrow(this.appMs, PORTFOLIOS_PATTERNS.FIND_ALL_BY_USER, { userId });
   }
 
-  getPortfolioByName(name: string) {
-    return sendOrThrow(this.appMs, PORTFOLIOS_PATTERNS.FIND_BY_NAME, { name });
+  getPortfolioByName(name: string, userId: number) {
+    return sendOrThrow(this.appMs, PORTFOLIOS_PATTERNS.FIND_BY_NAME, {
+      name,
+      userId,
+    });
   }
 
   getPortfolioDetailById(id: number, userId: number) {
@@ -30,8 +33,11 @@ export class PortfoliosService {
     return sendOrThrow(this.appMs, PORTFOLIOS_PATTERNS.USER_SUMMARY, { userId });
   }
 
-  deletePortfolio(id: number) {
-    return sendOrThrow(this.appMs, PORTFOLIOS_PATTERNS.DELETE_BY_ID, { id });
+  deletePortfolio(id: number, userId: number) {
+    return sendOrThrow(this.appMs, PORTFOLIOS_PATTERNS.DELETE_BY_ID, {
+      id,
+      userId,
+    });
   }
 
   getRecommendations(portfolioId: number, userId: number, lang?: 'ru' | 'en') {
