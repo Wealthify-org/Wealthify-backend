@@ -12,11 +12,12 @@ services:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      # SQL-дамп лежит на уровень выше backend-репо. Postgres-образ при
-      # ПЕРВОМ старте (пустой volume postgres_data) выполнит любой .sql
-      # из /docker-entrypoint-initdb.d/. На повторных запусках не делает
-      # ничего — данные из volume переживают рестарты.
-      - ../wealthify.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      # Seed-дамп закоммичен в репо: db/seed.sql.gz (gzip-сжатый ~15 МБ).
+      # postgres-образ нативно понимает .sql.gz — распакует и выполнит
+      # через gunzip|psql при ПЕРВОМ старте (пустой volume postgres_data).
+      # Содержит схему + спаршенный каталог криптоактивов, без чьих-либо
+      # пользовательских данных. На повторных запусках init не запускается.
+      - ./db/seed.sql.gz:/docker-entrypoint-initdb.d/01-seed.sql.gz:ro
     networks:
       - wealthify-network
     healthcheck:

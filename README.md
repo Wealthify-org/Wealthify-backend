@@ -1,167 +1,171 @@
-# Wealthify Backend
+# Wealthify — Backend
 
-REST API на **NestJS** c **PostgreSQL** и **Sequelize** для управления пользователями, портфелями и алертами. Документация подключена через Swagger.
+NestJS-монорепо: 7 микросервисов, общающихся через RabbitMQ, общая Postgres-БД,
+HTTP-шлюз на :5001 с Swagger-документацией.
 
-## 🔧 Стек
+## Стек
 
-* **NestJS** (HTTP, Guards, Validation)
-* **Sequelize** / `sequelize-typescript` (PostgreSQL: `pg`, `pg-hstore`)
-* **Zod**
-* **@nestjs/jwt**
-* **Swagger** (`@nestjs/swagger`, `swagger-ui-express`)
-* Тесты: **Jest** / **ts-jest** / **supertest**
-* Стиль: **ESLint** + **Prettier**
+- **Node 20**, **NestJS 11**, **TypeScript**
+- **Postgres 16** + Sequelize-typescript
+- **RabbitMQ 3** (RPC между микросервисами)
+- **Puppeteer** для парсинга крипто-данных с CoinGecko (через прокси-пул)
+- **Docker Compose** для локальной разработки
 
-> Версии см. в `package.json` репозитория.
+## Микросервисы
 
----
+| App | Роль | Порт |
+|---|---|---|
+| `api-gateway` | Единственный HTTP-вход. Swagger на `/api/docs`. | 5001 |
+| `identity` | Auth, users, roles, JWT, refresh-tokens, чат-история. | RPC |
+| `assets` | Каталог активов. | RPC |
+| `portfolio-core` | Портфели, позиции, транзакции. | RPC |
+| `crypto-data-worker` | Парсер CoinGecko (Puppeteer + прокси). | RPC |
+| `indexes-data-worker` | Fear & Greed, Dominance, market caps. | RPC |
+| `stock-data-worker` | Биржевые индексы (S&P, gold). | RPC |
 
-## ✅ Требования
+## Быстрый старт через Docker
 
-* Node.js LTS
-* PostgreSQL 15+ (локально или в Docker)
-* npm
-
----
-
-## 🚀 Быстрый старт (локально)
-
-1. Установка зависимостей (строго по `package-lock.json`):
-
-```bash
-npm ci
-```
-
-2. Настрой окружение — создайте `.env` в корне (пример ниже).
-
-3. Запуск в dev-режиме:
+### 1. Клонировать оба репо рядом
 
 ```bash
-npm run start:dev
+mkdir wealthify && cd wealthify
+git clone <Wealthify-backend-url>  # текущий репо
+git clone <wealthify-web-url>      # фронтенд
 ```
 
-4. Сборка и запуск в prod-режиме:
+Структура должна быть такой:
+
+```
+wealthify/
+├── Wealthify-backend/   ← вы здесь
+└── wealthify-web/       ← фронтенд (см. его README)
+```
+
+### 2. Поднять стек одной командой
+
+Из папки `Wealthify-backend/`:
 
 ```bash
-npm run build
-npm run start
+docker compose -f docker-compose.dev.yml up -d --build
 ```
 
----
+Compose поднимет:
+- `postgres` (Postgres 16) на `:5432`
+- `rabbitmq` (с UI на `:15672`, логин `guest/guest`)
+- 7 микросервисов
+- `web` — Next.js фронт на `:3000` (бэк-репо собирает фронт-контейнер)
 
-## 🧩 Переменные окружения
+### 3. Подождать первой инициализации
 
-Создайте файл `.env` в корне проекта:
-
-```env
-# Common
-NODE_ENV=development
-PORT=3001
-
-# DB (используйте DATABASE_URL или отдельные поля ниже)
-DB_HOST=localhost
-DB_PORT=5432
-DB_USER=postgres
-DB_PASSWORD=postgres
-DB_NAME=wealthify
-# Альтернатива: единая строка подключения
-# DATABASE_URL=postgresql://postgres:postgres@localhost:5432/wealthify
-
-# Auth/JWT
-JWT_SECRET=replace_me_with_strong_secret
-JWT_EXPIRES_IN=7d
-
-# CORS (опционально, через запятую)
-CORS_ORIGINS=http://localhost:3000
-```
-
-> В Docker Compose имена/порты БД могут отличаться — синхронизируйте `DB_HOST` c именем сервиса (`db` и т.п.).
-
----
-
-## 🗄️ База данных и миграции
-
-* ORM: **Sequelize** + **sequelize-typescript**.
-* Подключение через `DATABASE_URL` **или** `DB_*` из `.env`.
-* Если используете `sequelize-cli`, добавьте npm-скрипты (и конфиг `sequelize.config.ts`):
+При первом запуске Postgres выполнит `db/seed.sql.gz` — занимает 1-2 минуты:
 
 ```bash
-npm run db:migrate
-npm run db:seed
-npm run db:migrate:undo
+docker compose -f docker-compose.dev.yml logs -f postgres
 ```
 
----
+Когда увидите `database system is ready to accept connections` (после фразы
+`PostgreSQL init process complete`), БД готова.
 
-## 🐳 Запуск через Docker Compose
-
-### DEV
+После этого микросервисы автоматически дойдут до healthy и подключатся к
+RabbitMQ. Можно следить за всеми логами:
 
 ```bash
-docker compose -f ./docker-compose.dev.yml up -d --build
+docker compose -f docker-compose.dev.yml logs -f
 ```
 
-Полезные команды:
+### 4. Открыть приложение
+
+- Frontend: http://localhost:3000
+- API Gateway: http://localhost:5001
+- Swagger: http://localhost:5001/api/docs
+- RabbitMQ UI: http://localhost:15672 (`guest` / `guest`)
+
+## Что в seed-дампе
+
+`db/seed.sql.gz` (≈15 МБ сжатый, 42 МБ распакованный) содержит:
+
+- Полную схему всех таблиц
+- Каталог криптоактивов (≈110 монет с метаданными, логотипами, графиками
+  цен за 1d/7d/30d/90d/1y/max)
+- Снэпшоты индексов (Fear & Greed, Dominance, market caps)
+- Базовые роли (`USER`, `ADMIN`)
+
+**НЕ содержит** реальных пользователей, портфелей, транзакций — после первого
+запуска вы регистрируетесь свежим аккаунтом и работаете с нуля.
+
+## Что произойдёт после старта
+
+- **Crypto-data-worker** имеет cron, парсящий CoinGecko каждые 10 секунд
+  (`apps/crypto-data-worker/src/crypto-data-scrapper.service.ts:96`). Лимит на
+  парсер — 2050 топ-монет, полный цикл занимает ~3-4 часа. Каталог из seed'а
+  будет обновляться, новые монеты добавляться.
+- **Indexes/Stock workers** обновляют свои индексы по собственным расписаниям.
+- Если **прокси не настроены** или невалидны (`CRYPTO_SCRAPER_PROXIES` в
+  `.development.env`), парсер упрётся в rate-limit CoinGecko. Каталог из
+  seed'а останется, но новых обновлений не будет.
+
+## Полезные команды
 
 ```bash
-docker compose -f ./docker-compose.dev.yml logs -f api
-docker compose -f ./docker-compose.dev.yml logs -f db
-docker compose -f ./docker-compose.dev.yml down
-# с удалением volume'ов (удалит данные БД)
-docker compose -f ./docker-compose.dev.yml down -v
+# Перезапустить один микросервис (например после правки кода)
+docker compose -f docker-compose.dev.yml restart api-gateway
+
+# Сбросить БД к seed'у (полная очистка volume'а):
+docker compose -f docker-compose.dev.yml down -v
+docker compose -f docker-compose.dev.yml up -d --build
+
+# Зайти в Postgres напрямую:
+docker exec -it wealthify-postgres-dev psql -U postgres -d wealthify
+
+# Остановить всё:
+docker compose -f docker-compose.dev.yml down
 ```
 
-### PROD
+## Без Docker (локально)
+
+Понадобятся:
+- Postgres 16 на `localhost:5432` (БД `wealthify`, юзер `postgres`, пароль `root`)
+- RabbitMQ на `localhost:5672` (`guest/guest`)
+- Файл `.development.env` (есть пример в репо)
+- `npm ci && npm run dev` — поднимает все 7 микросервисов параллельно через
+  `concurrently`
+
+Залить seed вручную в локальный Postgres:
 
 ```bash
-docker compose -f ./docker-compose.prod.yml up -d --build
+gunzip -c db/seed.sql.gz | psql -h localhost -U postgres -d wealthify
 ```
 
-Остановить:
+## Архитектура (короче)
 
-```bash
-docker compose -f ./docker-compose.prod.yml down
-```
+- Gateway — единственный HTTP-фасад. Принимает запросы от фронта, валидирует
+  через `nestjs-zod`, форвардит в нужный микросервис через RabbitMQ-RPC.
+- Микросервисы общаются ТОЛЬКО через RabbitMQ — между собой напрямую не ходят.
+- Refresh-token хранится в HttpOnly-cookie на домене фронта; access-token —
+  в памяти фронта (auto-refresh за 30с до истечения).
+- Парсер крипты использует Puppeteer + Chromium (alpine) внутри Docker.
 
----
-
-## 📜 Скрипты npm
-
-```bash
-npm ci              # установка зависимостей (по lock-файлу)
-npm run lint        # ESLint (и Prettier, если подключён)
-npm test            # Jest
-npm run test:watch
-npm run test:cov
-npm run build       # сборка (dist/)
-npm start           # prod-режим (node dist/main.js)
-npm run start:dev   # dev-режим (watch)
-```
-
----
-
-## 📘 Swagger (API Docs)
-
-После запуска проверь адрес (порт из `.env`):
+## Структура
 
 ```
-http://localhost:3001/api/docs
+apps/
+├── api-gateway/         ← HTTP вход
+├── identity/            ← auth + users
+├── assets/              ← общий каталог
+├── portfolio-core/      ← портфели/транзакции
+├── crypto-data-worker/  ← парсер CoinGecko
+├── indexes-data-worker/ ← рыночные индексы
+└── stock-data-worker/   ← биржевые индексы
+
+libs/
+├── contracts/           ← общие DTO/типы (импорт через @libs/contracts)
+├── common/              ← общие константы (queue names, etc.)
+└── crypto-data/         ← общие Sequelize-модели
+
+db/
+└── seed.sql.gz          ← начальный дамп (схема + крипто-каталог)
 ```
 
----
+## Лицензия / контекст
 
-## 🔐 Безопасность
-
-* Используй длинный и уникальный `JWT_SECRET`.
-* В проде включай CORS по списку доменов (`CORS_ORIGINS`).
-* Секреты — только через переменные окружения/секрет-менеджер.
-* Логи без чувствительных данных.
-
----
-
-## 🧰 Траблшутинг
-
-* **API не видит БД в Docker:** совпадает ли `DB_HOST` с именем сервиса в compose (например, `db`)? Доступен ли порт?
-* **Миграции не применяются:** проверь `sequelize-cli` и конфиг подключения (та же строка, что и у рантайма).
-* **Порт занят:** поменяй `PORT` в `.env` или в compose-файле.
-* **Swagger 404:** проверь `main.ts` (путь `setupSwagger` и глобальный префикс).
+Проект — выпускная работа МГТУ «СТАНКИН». Не для коммерческого использования.
