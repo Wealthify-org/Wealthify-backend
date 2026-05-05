@@ -39,8 +39,11 @@ export class TransactionsService {
     }
   }
   
-  async createTransaction(dto: CreateTransactionDto) {
-    return this.transactionRepository.create(dto)
+  async createTransaction(
+    dto: CreateTransactionDto,
+    options?: { transaction?: import("sequelize").Transaction },
+  ) {
+    return this.transactionRepository.create(dto, options)
   }
 
   async getAllTransactions() {

@@ -6,11 +6,12 @@ import { Portfolio } from './portfolios.model';
 import { PortfolioAssets } from '../portfolio-assets/portfolio-assets.model';
 import { Transaction } from '../transactions/transactions.model';
 import { ClientsModule, Transport } from '@nestjs/microservices';
-import { ASSETS_CLIENT } from './portfolio.constants';
+import { ASSETS_CLIENT, WORKER_CLIENT } from './portfolio.constants';
+import { PortfolioHistoryService } from './portfolio-history.service';
 
 @Module({
   controllers: [PortfoliosController],
-  providers: [PortfoliosService],
+  providers: [PortfoliosService, PortfolioHistoryService],
   imports: [
     SequelizeModule.forFeature([Portfolio, PortfolioAssets, Transaction]),
     ClientsModule.register([
@@ -24,10 +25,21 @@ import { ASSETS_CLIENT } from './portfolio.constants';
           queueOptions: { durable: true },
         },
       },
+      {
+        name: WORKER_CLIENT,
+        transport: Transport.RMQ,
+        options: {
+          urls: [process.env.RABBITMQ_URL ?? "amqp://guest:guest@localhost:5672"],
+          // crypto-data-worker слушает свою очередь (см. WORKER_QUEUE в .env)
+          queue: process.env.WORKER_QUEUE ?? "crypto_data_worker_rpc",
+          queueOptions: { durable: true },
+        },
+      },
     ]),
   ],
   exports: [
-    PortfoliosService
+    PortfoliosService,
+    PortfolioHistoryService,
   ]
 })
 export class PortfoliosModule {}

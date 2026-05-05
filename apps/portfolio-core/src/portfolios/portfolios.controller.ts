@@ -1,12 +1,17 @@
 import { Controller } from '@nestjs/common';
 import { CreatePortfolioDto } from "@libs/contracts";
 import { PortfoliosService } from './portfolios.service';
+import { PortfolioHistoryService } from './portfolio-history.service';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 import { PORTFOLIOS_PATTERNS } from '@libs/contracts/portfolios/portfolios.pattern';
+import { ValueHistoryPeriod } from '@libs/contracts/portfolios/dto/value-history.dto';
 
 @Controller()
 export class PortfoliosController {
-  constructor(private readonly portfolioService: PortfoliosService) {}
+  constructor(
+    private readonly portfolioService: PortfoliosService,
+    private readonly historyService: PortfolioHistoryService,
+  ) {}
 
   @MessagePattern(PORTFOLIOS_PATTERNS.CREATE)
   create(@Payload() dto: CreatePortfolioDto) {
@@ -36,5 +41,13 @@ export class PortfoliosController {
   @MessagePattern(PORTFOLIOS_PATTERNS.DELETE_BY_ID)
   delete(@Payload() payload: { id: number; userId: number }) {
     return this.portfolioService.deletePortfolio(payload.id, payload.userId)
+  }
+
+  @MessagePattern(PORTFOLIOS_PATTERNS.VALUE_HISTORY)
+  valueHistory(
+    @Payload()
+    payload: { id: number; userId: number; period: ValueHistoryPeriod },
+  ) {
+    return this.historyService.getValueHistory(payload.id, payload.period);
   }
 }

@@ -18,9 +18,10 @@ export class CryptoDataWorkerController {
 
   @MessagePattern(CRYPTO_DATA_WORKER_PATTERNS.GET_ASSET_BY_TICKER)
   async getAssetByTicker(@Payload() payload: { ticker: string }) {
-    const asset = await this.cryptoDataWorkerService.getAssetByTicker(payload.ticker);
-
-    return asset?.toJSON();
+    // Сервис теперь возвращает плоский plain-объект (с маппингом id=assetId),
+    // а не Sequelize-модель. `.toJSON()` больше не нужен и его вызов на
+    // обычном объекте бросает TypeError.
+    return this.cryptoDataWorkerService.getAssetByTicker(payload.ticker);
   }
 
   @MessagePattern(CRYPTO_DATA_WORKER_PATTERNS.LIST_ASSETS)
@@ -36,6 +37,11 @@ export class CryptoDataWorkerController {
     const charts = await this.cryptoDataWorkerService.getChartsByTicker(payload.ticker);
 
     return charts;
+  }
+
+  @MessagePattern(CRYPTO_DATA_WORKER_PATTERNS.GET_DESCRIPTION_RU)
+  async getDescriptionRu(@Payload() payload: { ticker: string }) {
+    return this.cryptoDataWorkerService.getDescriptionRu(payload.ticker);
   }
 
   @MessagePattern(CRYPTO_DATA_WORKER_PATTERNS.SEARCH_ASSETS)

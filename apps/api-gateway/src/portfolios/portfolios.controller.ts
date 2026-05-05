@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
-import { ApiBody, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 import { PortfoliosService } from './portfolios.service';
 import { CreatePortfolioDto, CreatePortfolioWithoutUserDto } from '@libs/contracts';
@@ -7,6 +7,10 @@ import { CreatePortfolioDto, CreatePortfolioWithoutUserDto } from '@libs/contrac
 import { JwtAuthGuard } from '@gateway/common/guards/jwt-auth.guard';
 import { CurrentUser } from '@gateway/common/decorators/сurrent-user.decorator';
 import { UserPortfoliosSummaryDto } from '@libs/contracts/portfolios/dto/user-portfolios-summary.dto';
+import {
+  ValueHistoryPeriod,
+  VALUE_HISTORY_PERIODS,
+} from '@libs/contracts/portfolios/dto/value-history.dto';
 
 @ApiTags('Портфели')
 @Controller('portfolios')
@@ -85,6 +89,39 @@ export class PortfoliosController {
   delete(@Param('id') id: string, @CurrentUser('id') userId: number) {
     // Передаём userId — сервис проверит ownership перед destroy.
     return this.portfolios.deletePortfolio(Number(id), userId);
+  }
+
+  @Get(':id/value-history')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({
+    summary: 'История стоимости портфеля во времени',
+    description:
+      'Считает реальную историю value(t) и invested(t) на основе ' +
+      'транзакций пользователя × цен активов из crypto-data-worker. ' +
+      'Серия начинается с даты ПЕРВОЙ транзакции (раньше портфель пустой). ' +
+      'Период `max` = от первой транзакции до now.',
+  })
+  @ApiParam({ name: 'id', example: 1, description: 'ID портфеля' })
+  @ApiQuery({
+    name: 'period',
+    required: false,
+    enum: ['24h', '7d', '30d', '90d', '1y', 'max'],
+    description: 'По умолчанию `1y`',
+  })
+  @ApiResponse({ status: 200, description: 'Серия точек {ts, value, invested}' })
+  @ApiResponse({ status: 403, description: 'Чужой портфель' })
+  @ApiResponse({ status: 404, description: 'Портфель не найден' })
+  getValueHistory(
+    @Param('id') id: string,
+    @CurrentUser('id') userId: number,
+    @Query('period') period?: string,
+  ) {
+    const safePeriod: ValueHistoryPeriod = VALUE_HISTORY_PERIODS.includes(
+      period as ValueHistoryPeriod,
+    )
+      ? (period as ValueHistoryPeriod)
+      : '1y';
+    return this.portfolios.getValueHistory(Number(id), userId, safePeriod);
   }
 
   @Get(':id/recommendations')

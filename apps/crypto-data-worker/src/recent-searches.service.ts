@@ -97,9 +97,17 @@ export class RecentSearchesService {
     return { items };
   }
 
-  async removeOne(userId: number, recentId: number): Promise<void> {
+  /**
+   * Удалить одну запись из «недавних» по `assetId` (а не по recent_searches.id).
+   * Так фронт может удалить элемент, имея только `asset.id` — не приходится
+   * прокидывать ещё одно поле recentId через SearchAssetDto.
+   *
+   * Если у пользователя по какой-то причине несколько недавних на тот же
+   * assetId (исторический мусор) — удалятся все, что корректно.
+   */
+  async removeOne(userId: number, assetId: number): Promise<void> {
     await this.recentRepo.destroy({
-      where: { id: recentId, userId },
+      where: { assetId, userId },
     });
   }
 

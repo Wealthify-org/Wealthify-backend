@@ -21,6 +21,19 @@ export class CryptoDataWorkerService {
     return sendOrThrow(this.workerMs, CRYPTO_DATA_WORKER_PATTERNS.GET_CHARTS_BY_TICKER, { ticker });
   }
 
+  getDescriptionRu(ticker: string) {
+    // Длинные описания + free-модель `gpt-oss-120b:free` (имеет жёсткий
+    // rate-limit) → нужен большой timeout: до 6 чанков × до 60с/каждый
+    // + паузы 3с между ними + retry 3 попытки на чанк. Реалистичный
+    // worst-case ~5 минут. После первого успеха — мгновенно из БД.
+    return sendOrThrow(
+      this.workerMs,
+      CRYPTO_DATA_WORKER_PATTERNS.GET_DESCRIPTION_RU,
+      { ticker },
+      300_000,
+    );
+  }
+
   listAssets(limit?: number, offset?: number, category?: string) {
     return sendOrThrow(this.workerMs, CRYPTO_DATA_WORKER_PATTERNS.LIST_ASSETS, {
       limit,

@@ -139,6 +139,28 @@ export class CryptoDataWorkerController {
   }
 
   @ApiOperation({
+    summary: 'Получить русский перевод описания актива',
+    description:
+      'Описание берётся из базы (если уже переведено) или переводится ' +
+      'через LLM на лету и кешируется. Сохраняет HTML-разметку оригинала.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Объект с переведённым description (или null если у актива нет английского описания)',
+    schema: {
+      example: { description: '<p>Биткоин — первая в мире...' },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Актив с указанным тикером не найден',
+  })
+  @Get(':ticker/description-ru')
+  async getDescriptionRu(@Param('ticker') ticker: string) {
+    return this.cryptoDataWorkerService.getDescriptionRu(ticker);
+  }
+
+  @ApiOperation({
     summary: "Получить недавние поисковые запросы пользователя",
   })
   @ApiQuery({

@@ -6,4 +6,9 @@ export const PORTFOLIOS_PATTERNS = {
   DELETE_BY_ID: "portfolios.deleteById",
 
   USER_SUMMARY: "portfolios.user_summary",
+
+  // Реальная история стоимости портфеля во времени, посчитанная как
+  // свёртка транзакций × ценовых историй активов. Возвращает только
+  // точки начиная с даты первой транзакции (раньше — портфель пустой).
+  VALUE_HISTORY: "portfolios.valueHistory",
 };

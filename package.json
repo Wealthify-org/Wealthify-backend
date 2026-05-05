@@ -8,7 +8,6 @@
   "scripts": {
     "build:workers": "tsc -p apps/crypto-data-worker/tsconfig.worker.json",
     "build": "nest build && npm run build:workers",
-
     "start:gateway:dev": "cross-env NODE_ENV=development nest start api-gateway --watch",
     "start:assets:dev": "cross-env NODE_ENV=development nest start assets --watch",
     "start:worker:dev": "cross-env NODE_ENV=development nest start crypto-data-worker --watch",
@@ -16,13 +15,9 @@
     "start:portfolio-core:dev": "cross-env NODE_ENV=development nest start portfolio-core --watch",
     "start:indexes:dev": "cross-env NODE_ENV=development nest start indexes-data-worker --watch",
     "start:stocks:dev": "cross-env NODE_ENV=development nest start stock-data-worker --watch",
-
     "dev:workers": "tsc -p apps/crypto-data-worker/tsconfig.worker.json --watch",
-
     "start:all:dev": "concurrently -k -n GATEWAY,ASSETS,CRYPTO-WORKER,IDENTITY,PORTFOLIO,WORKERS,INDEXES,STOCKS -c auto \"npm run start:gateway:dev\" \"npm run start:assets:dev\" \"npm run start:worker:dev\" \"npm run start:identity:dev\" \"npm run start:portfolio-core:dev\" \"npm run dev:workers\" \"npm run start:indexes:dev\" \"npm run start:stocks:dev\"",
-
     "dev": "npm run build:workers && npm run start:all:dev",
-
     "start:gateway:prod": "node -r tsconfig-paths/register dist/apps/api-gateway/main.js",
     "start:assets:prod": "node -r tsconfig-paths/register dist/apps/assets/main.js",
     "start:worker:prod": "node -r tsconfig-paths/register dist/apps/crypto-data-worker/main.js",
@@ -30,9 +25,7 @@
     "start:portfolio-core:prod": "node -r tsconfig-paths/register dist/apps/portfolio-core/main.js",
     "start:indexes:prod": "node -r tsconfig-paths/register dist/apps/indexes-data-worker/main.js",
     "start:stocks:prod": "node -r tsconfig-paths/register dist/apps/stock-data-worker/main.js",
-
     "start:all:prod": "npm run build && concurrently -k -n GATEWAY,ASSETS,CRYPTO-WORKER,IDENTITY,PORTFOLIO,INDEXES,STOCKS -c auto \"npm run start:gateway:prod\" \"npm run start:assets:prod\" \"npm run start:worker:prod\" \"npm run start:identity:prod\" \"npm run start:portfolio-core:prod\" \"npm run start:indexes:prod\" \"npm run start:stocks:prod\"",
-
     "format": "prettier --write \"apps/**/*.ts\" \"libs/**/*.ts\"",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
@@ -55,6 +48,7 @@
     "amqp-connection-manager": "^5.0.0",
     "amqplib": "^0.10.9",
     "bcryptjs": "^3.0.2",
+    "cheerio": "^1.2.0",
     "cookie-parser": "^1.4.7",
     "cross-env": "^7.0.3",
     "nestjs-zod": "^5.0.1",

@@ -5,6 +5,7 @@ export const CRYPTO_DATA_WORKER_PATTERNS = {
   LIST_ASSETS: "cryptoDataWorker.listAssets",
   GET_CHARTS_BY_TICKER: "cryptoDataWorker.getChartsByTicker",
   SEARCH_ASSETS: "cryptoDataWorker.searchAssets",
+  GET_DESCRIPTION_RU: "cryptoDataWorker.getDescriptionRu",
   
   LIST_RECENT_SEARCHES: "cryptoDataWorker.listRecentSearches",
   ADD_RECENT_SEARCH: "cryptoDataWorker.addRecentSearch",

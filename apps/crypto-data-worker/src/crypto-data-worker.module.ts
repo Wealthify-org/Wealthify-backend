@@ -12,6 +12,7 @@ import { CryptoDataFetcherService } from './crypto-data-fetcher.service';
 import { CryptoLogosModule } from './crypto-logos/crypto-logos.module';
 import { RecentSearch } from '@libs/crypto-data/models/recent-search.model';
 import { RecentSearchesService } from './recent-searches.service';
+import { TranslatorModule } from './translator/translator.module';
 
 @Module({
   controllers: [CryptoDataWorkerController],
@@ -39,6 +40,7 @@ import { RecentSearchesService } from './recent-searches.service';
     }),
     SequelizeModule.forFeature([CryptoAssetData, CryptoCandle, CryptoChartsData, Asset, RecentSearch]),
     CryptoLogosModule,
+    TranslatorModule,
   ],
 })
 export class CryptoDataWorkerModule {}

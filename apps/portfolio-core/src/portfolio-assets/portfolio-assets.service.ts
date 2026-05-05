@@ -1,7 +1,9 @@
 import { HttpStatus, Inject, Injectable, Logger } from "@nestjs/common";
-import { InjectModel } from "@nestjs/sequelize";
+import { InjectConnection, InjectModel } from "@nestjs/sequelize";
 import { ClientProxy } from "@nestjs/microservices";
 import { catchError, lastValueFrom, of, throwError, timeout } from "rxjs";
+import { Sequelize } from "sequelize-typescript";
+import type { Transaction as SeqTx } from "sequelize";
 
 const RPC_TIMEOUT_MS = 5_000;
 const rpcLog = new Logger("PortfolioAssetsService.RPC");
@@ -37,6 +39,8 @@ export class PortfolioAssetsService {
     private readonly transactionsService: TransactionsService,
     @Inject(ASSETS_CLIENT)
     private readonly assetsClient: ClientProxy,
+    @InjectConnection()
+    private readonly sequelize: Sequelize,
   ) {}
 
   private async getAssetByTickerOrThrow(ticker: string): Promise<AssetDto> {
@@ -140,9 +144,8 @@ export class PortfolioAssetsService {
   async addAssetToPortfolio(dto: AddAssetToPortfolioDto, userId: number) {
     const { portfolioId, assetTicker, quantity, purchasePrice } = dto;
 
+    // ── ВАЛИДАЦИЯ + RPC до tx ───────────────────────────────────────────
     await this.assertPortfolioOwnedByUser(portfolioId, userId);
-
-    const asset = await this.getAssetByTickerOrThrow(assetTicker);
 
     if (quantity <= 0) {
       rpcError(
@@ -160,46 +163,61 @@ export class PortfolioAssetsService {
       );
     }
 
-    let portfolioAsset = await this.portfolioAssetRepository.findOne({
-      where: { portfolioId, assetId: asset.id },
-    });
+    const asset = await this.getAssetByTickerOrThrow(assetTicker);
 
-    const now = new Date();
-
-    if (portfolioAsset) {
-      const newQuantity =
-        portfolioAsset.quantity + quantity;
-      const newAverageBuyPrice =
-        (portfolioAsset.quantity * portfolioAsset.averageBuyPrice +
-          quantity * purchasePrice) /
-        newQuantity;
-
-      portfolioAsset.quantity = newQuantity;
-      portfolioAsset.averageBuyPrice = newAverageBuyPrice;
-      portfolioAsset.purchaseDate = now;
-      await portfolioAsset.save();
-    } else {
-      portfolioAsset = await this.portfolioAssetRepository.create({
-        portfolioId,
-        assetId: asset.id,
-        quantity,
-        averageBuyPrice: purchasePrice,
+    // ── DB-MUTATIONS В TX ───────────────────────────────────────────────
+    // Раньше: findOne → conditional create()/save() без транзакции и без
+    // row-lock. На двойном POST (быстрый клик / retry) оба запроса видели
+    // null → оба create() → второй ловил SequelizeUniqueConstraintError
+    // (по unique-индексу portfolioId+assetId), а пользователь получал 500.
+    // Теперь: SELECT FOR UPDATE сериализует параллельные buy одного актива
+    // → второй увидит уже созданную строку и пойдёт по update-ветке.
+    return this.sequelize.transaction(async (t) => {
+      const now = new Date();
+      let portfolioAsset = await this.portfolioAssetRepository.findOne({
+        where: { portfolioId, assetId: asset.id },
+        lock: t.LOCK.UPDATE,
+        transaction: t,
       });
 
-      portfolioAsset.purchaseDate = now;
-      await portfolioAsset.save();
-    }
+      if (portfolioAsset) {
+        const newQuantity = portfolioAsset.quantity + quantity;
+        const newAverageBuyPrice =
+          (portfolioAsset.quantity * portfolioAsset.averageBuyPrice +
+            quantity * purchasePrice) /
+          newQuantity;
 
-    await this.transactionsService.createTransaction({
-      portfolioId,
-      assetId: asset.id,
-      quantity,
-      pricePerUnit: purchasePrice,
-      type: TransactionType.BUY,
-      date: now,
+        portfolioAsset.quantity = newQuantity;
+        portfolioAsset.averageBuyPrice = newAverageBuyPrice;
+        portfolioAsset.purchaseDate = now;
+        await portfolioAsset.save({ transaction: t });
+      } else {
+        portfolioAsset = await this.portfolioAssetRepository.create(
+          {
+            portfolioId,
+            assetId: asset.id,
+            quantity,
+            averageBuyPrice: purchasePrice,
+            purchaseDate: now,
+          } as any,
+          { transaction: t },
+        );
+      }
+
+      await this.transactionsService.createTransaction(
+        {
+          portfolioId,
+          assetId: asset.id,
+          quantity,
+          pricePerUnit: purchasePrice,
+          type: TransactionType.BUY,
+          date: now,
+        },
+        { transaction: t },
+      );
+
+      return portfolioAsset;
     });
-
-    return portfolioAsset;
   }
 
   async sellAsset(dto: SellAssetDto, userId: number) {
@@ -211,21 +229,10 @@ export class PortfolioAssetsService {
       pricePerUnit,
     } = dto;
 
+    // ── ВАЛИДАЦИЯ + RPC до транзакции ────────────────────────────────────
+    // RPC к assets-MS DB-state не трогает, делать в транзакции
+    // их нельзя (ms-вызов длинный → удержит row-lock). Поэтому до tx.
     await this.assertPortfolioOwnedByUser(portfolioId, userId);
-
-    const asset = await this.getAssetByTickerOrThrow(assetTicker);
-
-    let portfolioAsset = await this.portfolioAssetRepository.findOne({
-      where: { portfolioId, assetId: asset.id },
-    });
-
-    if (!portfolioAsset) {
-      rpcError(
-        HttpStatus.NOT_FOUND,
-        "ASSET_NOT_IN_PORTFOLIO",
-        `No such asset ${assetTicker} in portfolio ${portfolioId}`,
-      );
-    }
 
     if (quantity <= 0) {
       rpcError(
@@ -235,55 +242,151 @@ export class PortfolioAssetsService {
       );
     }
 
-    if (portfolioAsset.quantity < quantity) {
+    if (convertToUsd && (!pricePerUnit || pricePerUnit <= 0)) {
       rpcError(
         HttpStatus.BAD_REQUEST,
-        "NOT_ENOUGH_ASSET",
-        "Not enough asset to sell",
+        "INVALID_PRICE",
+        "Asset price should be greater than zero",
       );
     }
 
-    if (portfolioAsset.quantity === quantity) {
-      await portfolioAsset.destroy();
-    } else {
-      portfolioAsset.quantity -= quantity;
-      await portfolioAsset.save();
-    }
+    const asset = await this.getAssetByTickerOrThrow(assetTicker);
+    const usdAsset = convertToUsd ? await this.ensureUsdAsset() : null;
 
-    if (convertToUsd) {
-      if (!pricePerUnit || pricePerUnit <= 0) {
+    // ── DB-MUTATIONS В ОДНОЙ ТРАНЗАКЦИИ ─────────────────────────────────
+    // Раньше: destroy/save/create были последовательными без tx. Если
+    // assets-MS моргал на ensureUsdAsset, или БД падала на createTransaction
+    // — пользователь терял asset без USD-кредита и без аудит-записи.
+    // Теперь: всё в одной atomic-tx. Любая ошибка → полный rollback,
+    // юзер видит ошибку, но в БД ничего не изменилось.
+    return this.sequelize.transaction(async (t) => {
+      const portfolioAsset = await this.portfolioAssetRepository.findOne({
+        where: { portfolioId, assetId: asset.id },
+        // FOR UPDATE — блокируем строку до конца tx, чтобы параллельная
+        // продажа того же актива не привела к двойному списанию или
+        // отрицательному quantity.
+        lock: t.LOCK.UPDATE,
+        transaction: t,
+      });
+
+      if (!portfolioAsset) {
         rpcError(
-          HttpStatus.BAD_REQUEST,
-          "INVALID_PRICE",
-          "Asset price should be greater than zero",
+          HttpStatus.NOT_FOUND,
+          "ASSET_NOT_IN_PORTFOLIO",
+          `No such asset ${assetTicker} in portfolio ${portfolioId}`,
         );
       }
 
-      const usdAmount = quantity * pricePerUnit;
+      if (portfolioAsset.quantity < quantity) {
+        rpcError(
+          HttpStatus.BAD_REQUEST,
+          "NOT_ENOUGH_ASSET",
+          "Not enough asset to sell",
+        );
+      }
 
-      const usdAsset = await this.ensureUsdAsset();
+      if (portfolioAsset.quantity === quantity) {
+        await portfolioAsset.destroy({ transaction: t });
+      } else {
+        portfolioAsset.quantity -= quantity;
+        await portfolioAsset.save({ transaction: t });
+      }
 
-      await this.addAssetToPortfolio(
+      // USD-кредит инлайн в той же транзакции. Раньше мы рекурсивно звали
+      // addAssetToPortfolio — это делало доп. ownership-check, RPC, и
+      // плодило транзакции вне нашей tx. Теперь всё локально.
+      if (convertToUsd && usdAsset && pricePerUnit) {
+        const usdAmount = quantity * pricePerUnit;
+
+        // Cost-basis carry-over (см. подробное описание ниже исходного кода
+        // в истории — формула: usd_avgBuy = avg_buy_of_sold / sellPrice).
+        const soldAvgBuy = portfolioAsset.averageBuyPrice;
+        const usdPurchasePrice =
+          Number.isFinite(soldAvgBuy) && soldAvgBuy > 0
+            ? soldAvgBuy / pricePerUnit
+            : 1;
+
+        await this.creditUsdInTx(
+          t,
+          portfolioId,
+          usdAsset.id,
+          usdAmount,
+          usdPurchasePrice,
+        );
+      }
+
+      await this.transactionsService.createTransaction(
         {
           portfolioId,
-          assetTicker: usdAsset.ticker,
-          quantity: usdAmount,
-          purchasePrice: 1,
+          assetId: asset.id,
+          quantity,
+          pricePerUnit: pricePerUnit ?? 0,
+          type: TransactionType.SELL,
+          date: new Date(),
         },
-        userId,
+        { transaction: t },
+      );
+
+      return portfolioAsset;
+    });
+  }
+
+  /**
+   * Атомарный USD-кредит внутри уже открытой sequelize-tx. Делает upsert по
+   * (portfolioId, usdAssetId): если позиция уже есть — реусредняет avgBuy,
+   * нет — создаёт. Записывает BUY-транзакцию для USD.
+   *
+   * НЕ ВЫЗЫВАТЬ снаружи sellAsset — нет ownership-check, рассчитан на то,
+   * что caller уже проверил права.
+   */
+  private async creditUsdInTx(
+    t: SeqTx,
+    portfolioId: number,
+    usdAssetId: number,
+    usdAmount: number,
+    usdPurchasePrice: number,
+  ): Promise<void> {
+    const now = new Date();
+    const existing = await this.portfolioAssetRepository.findOne({
+      where: { portfolioId, assetId: usdAssetId },
+      lock: t.LOCK.UPDATE,
+      transaction: t,
+    });
+
+    if (existing) {
+      const newQty = existing.quantity + usdAmount;
+      const newAvg =
+        (existing.quantity * existing.averageBuyPrice +
+          usdAmount * usdPurchasePrice) /
+        newQty;
+      existing.quantity = newQty;
+      existing.averageBuyPrice = newAvg;
+      existing.purchaseDate = now;
+      await existing.save({ transaction: t });
+    } else {
+      await this.portfolioAssetRepository.create(
+        {
+          portfolioId,
+          assetId: usdAssetId,
+          quantity: usdAmount,
+          averageBuyPrice: usdPurchasePrice,
+          purchaseDate: now,
+        } as any,
+        { transaction: t },
       );
     }
 
-    await this.transactionsService.createTransaction({
-      portfolioId,
-      assetId: asset.id,
-      quantity,
-      pricePerUnit: pricePerUnit ?? 0,
-      type: TransactionType.SELL,
-      date: new Date(),
-    });
-
-    return portfolioAsset;
+    await this.transactionsService.createTransaction(
+      {
+        portfolioId,
+        assetId: usdAssetId,
+        quantity: usdAmount,
+        pricePerUnit: usdPurchasePrice,
+        type: TransactionType.BUY,
+        date: now,
+      },
+      { transaction: t },
+    );
   }
 
   async removeAssetFromPortfolio(

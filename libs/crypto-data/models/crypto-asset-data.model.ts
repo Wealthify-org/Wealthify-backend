@@ -11,6 +11,7 @@ export interface CryptoAssetCreationAttrs {
   assetId: number;
 
   description?: string;
+  descriptionRu?: string;
   slug?: string;
   logoUrl?: string | null;
 
@@ -68,6 +69,16 @@ export class CryptoAssetData extends Model<CryptoAssetData, CryptoAssetCreationA
   @ApiProperty({ example: 'Первая и крупнейшая криптовалюта…', required: false })
   @Column({ type: DataType.TEXT, allowNull: true })
   declare description?: string;
+
+  @ApiProperty({
+    example: 'Биткоин — первая в мире децентрализованная криптовалюта…',
+    required: false,
+    description:
+      'Русский перевод description (HTML-safe, делается лениво при первом ' +
+      'запросе с lang=ru, кешируется в БД).',
+  })
+  @Column({ type: DataType.TEXT, allowNull: true })
+  declare descriptionRu?: string;
 
   // CoinGecko slug — единственный устойчивый идентификатор. Используется
   // как conflict-key при upsert'е. allowNull=true оставлен для legacy-

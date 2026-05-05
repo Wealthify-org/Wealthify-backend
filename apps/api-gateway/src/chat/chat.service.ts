@@ -222,6 +222,7 @@ export class ChatService {
     let assistantBuffer = "";
     try {
       for await (const delta of this.openRouter.streamChat({
+        model: "anthropic/claude-haiku-4.5",
         messages,
         temperature: 0.45,
         topP: 0.9,

@@ -13,6 +13,7 @@ import {
   getAssetCategoryIds,
   parseCategoriesString,
 } from "@libs/contracts/crypto-data-worker";
+import { DescriptionTranslatorService } from "./translator/description-translator.service";
 
 
 @Injectable()
@@ -27,6 +28,7 @@ export class CryptoDataWorkerService {
     private readonly assetRepo: typeof Asset,
     @InjectConnection()
     private readonly sequelize: Sequelize,
+    private readonly translator: DescriptionTranslatorService,
   ) {}
 
   // ЧТЕНИЕ ДАННЫХ
@@ -49,7 +51,43 @@ export class CryptoDataWorkerService {
       );
     }
 
-    return assetData;
+    // ВАЖНО: маппим в ту же форму, что и listAssets — `id` должен быть
+    // `assetId` (PK таблицы `assets`), потому что favoritesStore + endpoint
+    // /favorites/* работают именно с этим id. Раньше тут возвращался
+    // raw-Sequelize row, у которого `id` = PK таблицы `crypto_assets`
+    // (другое число) — из-за этого на странице актива звезда «избранного»
+    // не отображала уже-добавленный актив, а клик по ней слал неверный
+    // id на бэкенд.
+    const row = assetData;
+    return {
+      id: row.assetId,
+      assetId: row.assetId,
+      name: row.name,
+      ticker: row.ticker,
+      logoUrlLocal: row.logoUrlLocal ?? null,
+      logoUrl: row.logoUrl ?? null,
+      rank: row.rank ?? null,
+      slug: row.slug ?? null,
+      description: row.description ?? null,
+      currentPriceUsd: row.currentPriceUsd ?? null,
+      change1HUsdPct: row.change1HUsdPct ?? null,
+      change24HUsdPct: row.change24HUsdPct ?? null,
+      change7DUsdPct: row.change7DUsdPct ?? null,
+      change14DUsdPct: row.change14DUsdPct ?? null,
+      change30DUsdPct: row.change30DUsdPct ?? null,
+      change1YUsdPct: row.change1YUsdPct ?? null,
+      marketCapUsd: row.marketCapUsd ?? null,
+      fdvUsd: row.fdvUsd ?? null,
+      volume24HUsd: row.volume24HUsd ?? null,
+      circulatingSupply: row.circulatingSupply ?? null,
+      totalSupply: row.totalSupply ?? null,
+      maxSupply: row.maxSupply ?? null,
+      contractAddress: row.contractAddress ?? null,
+      sparkline7D: row.sparkline7D ?? null,
+      categories: parseCategoriesString(row.categories),
+      categoryIds: getAssetCategoryIds(row.categories),
+      lastUpdatedAt: row.lastUpdatedAt ?? null,
+    };
   }
 
   async listAssets(params?: { limit?: number; offset?: number; category?: string }) {
@@ -128,6 +166,69 @@ export class CryptoDataWorkerService {
       limit,
       offset,
     };
+  }
+
+  /**
+   * Возвращает русский перевод описания актива.
+   * Lazy-кеш: первый запрос → переводим через OpenRouter и сохраняем в
+   * `descriptionRu`. Последующие запросы — мгновенно из БД.
+   *
+   * Возвращаемая форма: `{ description: string | null }`. null когда
+   * у актива нет английского описания (некоторые wrapped/новые монеты).
+   */
+  async getDescriptionRu(ticker: string): Promise<{ description: string | null }> {
+    const upper = ticker.toUpperCase();
+    const row = await this.cryptoAssetRepo.findOne({
+      where: { ticker: upper },
+      attributes: ["id", "ticker", "description", "descriptionRu"],
+    });
+
+    if (!row) {
+      rpcError(
+        HttpStatus.NOT_FOUND,
+        "ASSET_NOT_FOUND",
+        `Asset with ticker ${upper} not found`,
+      );
+    }
+
+    if (row.descriptionRu) {
+      return { description: row.descriptionRu };
+    }
+
+    if (!row.description || row.description.trim().length === 0) {
+      return { description: null };
+    }
+
+    let translated: string;
+    let complete: boolean;
+    try {
+      const result = await this.translator.translateHtmlToRussian(row.description);
+      translated = result.html;
+      complete = result.complete;
+    } catch (e) {
+      this.log.warn(
+        `[getDescriptionRu] LLM failed for ${upper}: ${e instanceof Error ? e.message : e}`,
+      );
+      // Fallback на английский — лучше что-то чем ничего
+      return { description: row.description };
+    }
+
+    // Сохраняем в БД ТОЛЬКО при полном переводе всех чанков.
+    // Раньше кешировался mix RU+EN, если один из чанков сорвался — у
+    // длинных описаний (ETH, BTC) пользователь видел половину на английском
+    // навсегда. Теперь incomplete-результат отдаём в этом запросе, но
+    // НЕ персистим — следующий запрос попробует ещё раз.
+    if (complete && translated && translated !== row.description) {
+      await row.update({ descriptionRu: translated }).catch((e) => {
+        this.log.warn(`[getDescriptionRu] DB save failed: ${e?.message ?? e}`);
+      });
+    } else if (!complete) {
+      this.log.warn(
+        `[getDescriptionRu] ${upper}: partial translation — returning to user but NOT caching`,
+      );
+    }
+
+    return { description: translated };
   }
 
   async getChartsByTicker(ticker: string) {
