@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 import { PortfoliosService } from './portfolios.service';
@@ -77,6 +77,20 @@ export class PortfoliosController {
   @ApiResponse({ status: 403, description: 'Чужой портфель' })
   getDetail(@Param('id') id: string, @CurrentUser('id') userId: number) {
     return this.portfolios.getPortfolioDetailById(Number(id), userId);
+  }
+
+  @Patch(':id/currency')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Сменить валюту отображения портфеля (USD/RUB)' })
+  @ApiParam({ name: 'id', example: 1, description: 'ID портфеля' })
+  @ApiResponse({ status: 200, description: 'Валюта обновлена' })
+  @ApiResponse({ status: 403, description: 'Чужой портфель' })
+  setCurrency(
+    @Param('id') id: string,
+    @Body() body: { currency: string },
+    @CurrentUser('id') userId: number,
+  ) {
+    return this.portfolios.setDisplayCurrency(Number(id), userId, body?.currency);
   }
 
   @Delete(':id')

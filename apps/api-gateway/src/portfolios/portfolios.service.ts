@@ -41,6 +41,14 @@ export class PortfoliosService {
     });
   }
 
+  setDisplayCurrency(id: number, userId: number, currency: string) {
+    return sendOrThrow(this.appMs, PORTFOLIOS_PATTERNS.SET_CURRENCY, {
+      id,
+      userId,
+      currency,
+    });
+  }
+
   async getValueHistory(
     id: number,
     userId: number,

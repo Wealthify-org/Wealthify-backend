@@ -133,6 +133,10 @@ export function buildObservations(
   const obs: Observation[] = [];
   const actual = calcActualAllocation(portfolio);
 
+  // Для портфеля акций крипто-категории (stables/BTC/ETH/alts) не имеют смысла —
+  // строим только универсальные наблюдения (концентрация / диверсификация).
+  const isStock = (portfolio.type ?? "").toLowerCase().startsWith("stock");
+
   if (!portfolio.assets.length || portfolio.totalValueUsd <= 0) {
     obs.push({
       kind: "no_assets",
@@ -167,7 +171,7 @@ export function buildObservations(
     });
   }
 
-  if (risk) {
+  if (risk && !isStock) {
     const target = risk.targetAllocation;
 
     // 3) Drift по категориям — отклонение от целевой.
@@ -290,9 +294,9 @@ export function observationsToRecommendations(
           title: "Небольшое число активов в портфеле",
           description:
             o.fact +
-            " Несколько разных активов в портфеле обычно делают его более устойчивым к движениям отдельных монет.",
+            " Несколько разных активов в портфеле обычно делают его более устойчивым к движениям отдельных позиций.",
           action:
-            "Один из вариантов — добавить активы из разных категорий: BTC, ETH, крупные альты, стейблы.",
+            "Один из вариантов — добавить активы из разных секторов/категорий для большей устойчивости.",
         };
       case "stables_drift":
       case "btc_drift":

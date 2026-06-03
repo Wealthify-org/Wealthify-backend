@@ -7,7 +7,8 @@ import { ApiProperty } from "@nestjs/swagger";
 interface PortfolioCreationAttrs {
   name: string
   type: PortfolioType
-  userId: number 
+  userId: number
+  displayCurrency?: string
 }
 
 @Table({
@@ -44,6 +45,13 @@ export class Portfolio extends Model<Portfolio, PortfolioCreationAttrs> {
   @Index('portfolios_user_id_idx')
   @Column({type: DataType.INTEGER, allowNull: false})
   declare userId: number
+
+  // Валюта отображения стоимости портфеля: 'USD' или 'RUB'. Стоимость считается
+  // внутри в USD, а в ответе конвертируется в эту валюту. По умолчанию для
+  // Stock-портфелей — RUB, иначе USD (проставляется при создании).
+  @ApiProperty({ example: 'USD', description: 'Валюта отображения: USD | RUB' })
+  @Column({ type: DataType.STRING, allowNull: false, defaultValue: 'USD' })
+  declare displayCurrency: string
 
   @ApiProperty({ type: [Transaction], description: 'Список транзакций, связанных с этим портфелем', required: false })
   @HasMany(() => Transaction)

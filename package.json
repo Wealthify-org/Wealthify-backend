@@ -15,6 +15,7 @@
     "start:portfolio-core:dev": "cross-env NODE_ENV=development nest start portfolio-core --watch",
     "start:indexes:dev": "cross-env NODE_ENV=development nest start indexes-data-worker --watch",
     "start:stocks:dev": "cross-env NODE_ENV=development nest start stock-data-worker --watch",
+    "capture:indexes": "cross-env NODE_ENV=development ts-node -r tsconfig-paths/register apps/indexes-data-worker/src/capture-once.ts",
     "dev:workers": "tsc -p apps/crypto-data-worker/tsconfig.worker.json --watch",
     "start:all:dev": "concurrently -k -n GATEWAY,ASSETS,CRYPTO-WORKER,IDENTITY,PORTFOLIO,WORKERS,INDEXES,STOCKS -c auto \"npm run start:gateway:dev\" \"npm run start:assets:dev\" \"npm run start:worker:dev\" \"npm run start:identity:dev\" \"npm run start:portfolio-core:dev\" \"npm run dev:workers\" \"npm run start:indexes:dev\" \"npm run start:stocks:dev\"",
     "dev": "npm run build:workers && npm run start:all:dev",

@@ -38,6 +38,17 @@ export class PortfoliosController {
     return this.portfolioService.getUserSummary(payload.userId);
   }
 
+  @MessagePattern(PORTFOLIOS_PATTERNS.SET_CURRENCY)
+  setCurrency(
+    @Payload() payload: { id: number; userId: number; currency: string },
+  ) {
+    return this.portfolioService.setDisplayCurrency(
+      payload.id,
+      payload.userId,
+      payload.currency,
+    );
+  }
+
   @MessagePattern(PORTFOLIOS_PATTERNS.DELETE_BY_ID)
   delete(@Payload() payload: { id: number; userId: number }) {
     return this.portfolioService.deletePortfolio(payload.id, payload.userId)

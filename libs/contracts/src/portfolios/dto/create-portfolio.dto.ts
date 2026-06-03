@@ -17,6 +17,11 @@ export const CreatePortfolioSchema = z
       .coerce.number()
       .int()
       .describe('ID пользователя, которому принадлежит портфель'),
+
+    displayCurrency: z
+      .string()
+      .optional()
+      .describe('Валюта отображения стоимости: USD | RUB (по умолчанию по типу)'),
   })
   .strict();
   

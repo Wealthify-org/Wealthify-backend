@@ -7,6 +7,8 @@ export const PORTFOLIOS_PATTERNS = {
 
   USER_SUMMARY: "portfolios.user_summary",
 
+  SET_CURRENCY: "portfolios.setCurrency",
+
   // Реальная история стоимости портфеля во времени, посчитанная как
   // свёртка транзакций × ценовых историй активов. Возвращает только
   // точки начиная с даты первой транзакции (раньше — портфель пустой).

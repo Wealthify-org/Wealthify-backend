@@ -8,10 +8,11 @@ import { Transaction } from '../transactions/transactions.model';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { ASSETS_CLIENT, WORKER_CLIENT } from './portfolio.constants';
 import { PortfolioHistoryService } from './portfolio-history.service';
+import { FxService } from './fx.service';
 
 @Module({
   controllers: [PortfoliosController],
-  providers: [PortfoliosService, PortfolioHistoryService],
+  providers: [PortfoliosService, PortfolioHistoryService, FxService],
   imports: [
     SequelizeModule.forFeature([Portfolio, PortfolioAssets, Transaction]),
     ClientsModule.register([

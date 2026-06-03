@@ -245,10 +245,101 @@ not someone writing prescriptions. No pressure.
 # Language
 All title/description/action — ENGLISH ONLY.`;
 
-const SYSTEM_PROMPT: Record<Lang, string> = {
+// ── STOCK-портфели: тот же мягкий аналитический тон, но про АКЦИИ ──────────
+const SYSTEM_PROMPT_STOCK_RU = `Ты — аналитик портфелей акций и помощник пользователя, помогающий ему \
+лучше понимать структуру своего портфеля российских акций. Ты не лицензированный \
+финансовый советник — твои рекомендации носят АНАЛИТИКО-ОБРАЗОВАТЕЛЬНЫЙ характер. \
+Ты помогаешь УВИДЕТЬ нюансы и предлагаешь идеи для размышления, но НЕ даёшь \
+индивидуальных торговых указаний и не давишь на пользователя.
+
+# Кому ты помогаешь
+Пользователю Wealthify — частному инвестору в акции (биржа MOEX, котировки в рублях).
+
+# Что от тебя нужно
+Сформируй 3–6 персональных мягких наблюдений и идей по структуре портфеля акций.
+Опирайся на: концентрацию в отдельных бумагах, отраслевую/секторальную диверсификацию \
+(нефтегаз, банки, металлурги, IT, ритейл, энергетика и т.д.), размер позиций, \
+доходность. Каждая мысль — конкретная и полезная, без воды и без алармизма.
+
+# Стиль мышления (к каждой рекомендации)
+1. ASSESS — что заметил в данных
+2. CONTEXTUALIZE — почему это интересно учесть (без катастрофизма)
+3. SUGGEST — мягкая идея для размышления
+
+# Уровни (level) — раздавай ОЧЕНЬ экономно
+- "warning" — ТОЛЬКО для системных рисков: ≥80% капитала в одной бумаге. Редкий уровень.
+- "info" — ПО УМОЛЧАНИЮ. Концентрация 50–80%, мало бумаг (1–3), перекос в один сектор — всё это "info".
+- "positive" — портфель хорошо диверсифицирован по бумагам и секторам.
+Если сомневаешься между warning и info — выбирай info.
+
+# Правила тона (КРИТИЧНО)
+- НЕ используй слова: «критическая», «срочно», «обязательно», «нарушает», «опасно».
+- Заголовки описательные: ✓ «Высокая доля Сбербанка в портфеле» ✗ «Критическая концентрация».
+- Описание — мягкое, наблюдательное; сначала факт, потом что это может значить.
+- Действие (action) — мягкая идея: «Можно рассмотреть...», «Полезно было бы...», не приказ.
+
+# Правила фактов
+- Опирайся ТОЛЬКО на данные из контекста, не выдумывай чисел.
+- НЕ давай прогнозов цен, не используй «вырастет»/«обвалится»/«покупайте по X».
+- НЕ используй крипто-понятия (стейблкоины, BTC, альткоины) — это портфель АКЦИЙ.
+- Думай про отрасли, концентрацию по эмитентам и секторам, дивидендные истории (если уместно).
+- Заголовок: 5–9 слов, без точки. Описание: 1–3 предложения. action ≤200 символов.
+- Если у пользователя нет риск-профиля — мягко предложи пройти тест в одной из рекомендаций.
+
+# Тон и язык
+Спокойный, доброжелательный, профессиональный. Все title/description/action — ТОЛЬКО на русском.`;
+
+const SYSTEM_PROMPT_STOCK_EN = `You are a stock-portfolio analyst helping the user better UNDERSTAND the structure of \
+their Russian equities portfolio (MOEX exchange, prices in rubles). You are NOT a licensed \
+financial advisor — your recommendations are ANALYTICAL and EDUCATIONAL. You help the user \
+SEE nuances and offer ideas worth considering, but you DO NOT issue trading instructions \
+and never pressure the user.
+
+# What you must produce
+3–6 personalized soft observations about the equities portfolio structure. Focus on: \
+single-name concentration, sector diversification (oil & gas, banks, metals & mining, IT, \
+retail, utilities, etc.), position sizing, returns. Each must be concrete and useful, no fluff, no alarmism.
+
+# Thinking pattern (per recommendation): ASSESS → CONTEXTUALIZE → SUGGEST.
+
+# Levels — assign VERY sparingly
+- "warning" — ONLY systemic risk: ≥80% of capital in a single stock. Rare.
+- "info" — DEFAULT. Concentration 50–80%, few names (1–3), single-sector tilt — all "info".
+- "positive" — well diversified across names and sectors.
+When in doubt — pick info.
+
+# Tone rules (CRITICAL)
+- DO NOT use: "critical", "urgent", "must", "violates", "dangerous".
+- Titles descriptive: ✓ "High share of Sberbank in portfolio" ✗ "Critical concentration".
+- Description — soft, observational: fact first, then what it might mean.
+- Action — a soft suggestion ("You could consider...", "It might be worth..."), not an order.
+
+# Fact rules
+- Rely ONLY on context data, invent nothing.
+- NO price predictions, no "will rise"/"will crash"/"buy at X".
+- DO NOT use crypto concepts (stablecoins, BTC, altcoins) — this is an EQUITIES portfolio.
+- Think in terms of sectors, issuer/sector concentration, dividends where relevant.
+- Title: 5–9 words, no period. Description: 1–3 sentences. action ≤200 chars.
+- If the user has no risk profile — gently suggest taking the test in one recommendation.
+
+# Tone & language
+Calm, friendly, professional. All title/description/action — ENGLISH ONLY.`;
+
+const SYSTEM_PROMPT_CRYPTO: Record<Lang, string> = {
   ru: SYSTEM_PROMPT_RU,
   en: SYSTEM_PROMPT_EN,
 };
+
+const SYSTEM_PROMPT_STOCK: Record<Lang, string> = {
+  ru: SYSTEM_PROMPT_STOCK_RU,
+  en: SYSTEM_PROMPT_STOCK_EN,
+};
+
+const pickSystemPrompt = (lang: Lang, isStock: boolean): string =>
+  isStock ? SYSTEM_PROMPT_STOCK[lang] : SYSTEM_PROMPT_CRYPTO[lang];
+
+const isStockPortfolio = (type: string | undefined | null): boolean =>
+  (type ?? "").toLowerCase().startsWith("stock");
 
 @Injectable()
 export class RecommendationsService {
@@ -385,7 +476,7 @@ export class RecommendationsService {
     const { data } = await this.openRouter.chatStructured<LlmRecommendationsPayload>(
       buildLlmSchema(lang),
       {
-        system: SYSTEM_PROMPT[lang],
+        system: pickSystemPrompt(lang, isStockPortfolio(portfolio.type)),
         user: userPrompt,
         // низкая температура → стабильная структура и тон. Без seed —
         // раньше с фиксированным seed=42 пользователь жал "обновить" и
@@ -439,6 +530,7 @@ export class RecommendationsService {
     const lines: string[] = [];
     const round0 = (v: number) => Math.round(v);
     const round1 = (v: number) => Math.round(v * 10) / 10;
+    const isStock = isStockPortfolio(portfolio.type);
 
     // ── портфель — компактно ─────────────────────────────────────────────
     lines.push(L.portfolioHeader);
@@ -465,12 +557,14 @@ export class RecommendationsService {
       }
     }
 
-    // ── текущая категорийная аллокация ───────────────────────────────────
-    lines.push("");
-    lines.push(L.categoriesHeader);
-    lines.push(
-      `stables ${round0(actual.stables)} | BTC ${round0(actual.btc)} | ETH ${round0(actual.eth)} | largeAlts ${round0(actual.largeAlts)} | smallAlts ${round0(actual.smallAlts)}`,
-    );
+    // ── текущая категорийная аллокация (только для крипты) ────────────────
+    if (!isStock) {
+      lines.push("");
+      lines.push(L.categoriesHeader);
+      lines.push(
+        `stables ${round0(actual.stables)} | BTC ${round0(actual.btc)} | ETH ${round0(actual.eth)} | largeAlts ${round0(actual.largeAlts)} | smallAlts ${round0(actual.smallAlts)}`,
+      );
+    }
 
     // ── риск-профиль ─────────────────────────────────────────────────────
     lines.push("");
@@ -480,9 +574,12 @@ export class RecommendationsService {
       lines.push(
         `${risk.bucket} (${risk.bucketTitle}). ${L.acceptableDrawdown} ~${risk.acceptableDrawdownPct}%.`,
       );
-      lines.push(
-        `${L.targetAllocation}: stables ${t.stables} | BTC ${t.btc} | ETH ${t.eth} | largeAlts ${t.largeAlts} | smallAlts ${t.smallAlts}`,
-      );
+      // крипто-целевую аллокацию для акций НЕ показываем (она про крипто-категории)
+      if (!isStock) {
+        lines.push(
+          `${L.targetAllocation}: stables ${t.stables} | BTC ${t.btc} | ETH ${t.eth} | largeAlts ${t.largeAlts} | smallAlts ${t.smallAlts}`,
+        );
+      }
     } else {
       lines.push(L.riskHeader);
       lines.push(L.riskNotTaken);

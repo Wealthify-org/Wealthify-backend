@@ -267,10 +267,13 @@ export class CryptoDataWorkerService {
     const rows = await this.cryptoAssetRepo.findAll({
       limit,
       where: {
+        // Матчим ТОЛЬКО по тикеру/названию/контракту. Раньше тут был ещё
+        // матч по `categories` — из-за него поиск "BTC" вытаскивал кучу
+        // несвязанных монет (Pendle, Lombard, Babylon…), у которых в тегах
+        // есть "BTC"-категории. Категории — это шум для поиска, убран.
         [Op.or]: [
           { ticker: { [Op.iLike]: ilike } },
           { name: { [Op.iLike]: ilike } },
-          { categories: { [Op.iLike]: ilike } },
           { contractAddress: { [Op.iLike]: ilike } },
         ],
       },

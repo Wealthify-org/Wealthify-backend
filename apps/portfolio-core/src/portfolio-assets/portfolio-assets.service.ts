@@ -121,9 +121,9 @@ export class PortfolioAssetsService {
   private async assertPortfolioOwnedByUser(
     portfolioId: number,
     userId: number,
-  ): Promise<void> {
+  ): Promise<Portfolio> {
     const portfolio = await this.portfolioRepository.findByPk(portfolioId, {
-      attributes: ["id", "userId"],
+      attributes: ["id", "userId", "type"],
     });
     if (!portfolio) {
       rpcError(
@@ -139,13 +139,31 @@ export class PortfolioAssetsService {
         `Portfolio ${portfolioId} doesn't belong to user ${userId}`,
       );
     }
+    return portfolio;
+  }
+
+  // Тип актива должен совпадать с типом портфеля. PortfolioType и AssetType —
+  // разные энамы, но с одинаковыми строковыми значениями ('Crypto'/'Stock'/
+  // 'Bond'), поэтому сравниваем по строке. Это закрывает баг, когда акцию
+  // (Stock) можно было положить в крипто-портфель.
+  private assertAssetTypeMatchesPortfolio(
+    assetType: AssetType,
+    portfolio: Portfolio,
+  ): void {
+    if (String(assetType) !== String(portfolio.type)) {
+      rpcError(
+        HttpStatus.BAD_REQUEST,
+        "ASSET_TYPE_MISMATCH",
+        `Asset of type ${assetType} cannot be added to a ${portfolio.type} portfolio`,
+      );
+    }
   }
 
   async addAssetToPortfolio(dto: AddAssetToPortfolioDto, userId: number) {
     const { portfolioId, assetTicker, quantity, purchasePrice } = dto;
 
     // ── ВАЛИДАЦИЯ + RPC до tx ───────────────────────────────────────────
-    await this.assertPortfolioOwnedByUser(portfolioId, userId);
+    const portfolio = await this.assertPortfolioOwnedByUser(portfolioId, userId);
 
     if (quantity <= 0) {
       rpcError(
@@ -164,6 +182,9 @@ export class PortfolioAssetsService {
     }
 
     const asset = await this.getAssetByTickerOrThrow(assetTicker);
+
+    // акция → только в Stock-портфель, крипта → только в Crypto-портфель
+    this.assertAssetTypeMatchesPortfolio(asset.type, portfolio);
 
     // ── DB-MUTATIONS В TX ───────────────────────────────────────────────
     // Раньше: findOne → conditional create()/save() без транзакции и без
